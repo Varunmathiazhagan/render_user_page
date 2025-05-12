@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { motion, useScroll, useSpring } from "framer-motion";
 import Navbar from "./components/Navbar";
 import Home from "./components/HomePage";
@@ -49,6 +49,7 @@ const App = () => {
   const [cart, setCart] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState(null);
+  const navigate = useNavigate();
   
   // Check authentication status on load
   useEffect(() => {
@@ -67,6 +68,17 @@ const App = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const tokenExpiry = localStorage.getItem("tokenExpiry");
+    if (tokenExpiry && new Date() > new Date(tokenExpiry)) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("tokenExpiry");
+      setIsAuthenticated(false);
+      navigate("/login");
+    }
+  }, [setIsAuthenticated, navigate]);
 
   const addToCart = (product) => {
     setCart((prevCart) => {

@@ -53,9 +53,11 @@ const Login = ({ setIsAuthenticated }) => {
       const response = await axios.post("http://localhost:5008/login", loginData);
 
       if (response.data && response.data.token) {
-        console.log("Login successful:", response.data);
+        const tokenExpiry = new Date();
+        tokenExpiry.setDate(tokenExpiry.getDate() + 1); // Set expiration to 1 day
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("tokenExpiry", tokenExpiry.toISOString());
         setIsAuthenticated(true);
         navigate("/");
       } else {

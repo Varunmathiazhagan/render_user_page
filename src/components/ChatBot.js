@@ -198,7 +198,7 @@ const ChatBot = () => {
       setShowGreeting(true);
       setTimeout(() => {
         setShowGreeting(false);
-      }, 5000);
+      }, 5008);
     }
   }, [isOpen]);
 
