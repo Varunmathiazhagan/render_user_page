@@ -1,6 +1,4 @@
-// Import translation function from TranslationContext
-import { useTranslation } from '../utils/TranslationContext';
-import { preprocessText, calculateSimilarity } from '../utils/nlpUtils';
+import { preprocessText } from '../utils/nlpUtils';
 
 // Helper function to use outside of React components
 const t = (text, namespace) => {
@@ -47,7 +45,7 @@ export const fuzzyMatch = (text, keyword) => {
 };
 
 // Page-specific content from the website
-const pageContent = {
+export const pageContent = {
   home: {
     title: "KSP Yarns - Sustainable Yarn Manufacturer",
     description: "Leading manufacturer of high-quality yarns including cotton, polyester, and blended yarns with a focus on sustainability and innovation.",

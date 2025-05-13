@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { FaRupeeSign, FaSpinner, FaRobot, FaThumbsUp, FaExclamationCircle, FaStar, FaRandom, FaMagic, FaDice, FaLightbulb, FaPalette } from "react-icons/fa";
-import { motion, AnimatePresence, useAnimation, useScroll } from "framer-motion";
+import React, { useState } from "react";
+import { FaSpinner, FaRobot, FaThumbsUp, FaExclamationCircle, FaStar, FaRandom, FaMagic, FaDice, FaLightbulb, FaPalette } from "react-icons/fa";
+import { motion, AnimatePresence, useScroll } from "framer-motion";
 import RobotLoader from './RobotLoader';
 import { useTranslation } from "../utils/TranslationContext";
 
@@ -23,7 +23,7 @@ const RecommendationsPage = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const ITEMS_PER_PAGE = 3;
-  const [uniquenessFactor, setUniquenessFactor] = useState(0.5);
+  const uniquenessFactor = 0.5;
   const [sessionSeed, setSessionSeed] = useState(Date.now());
   const [lastInputSignature, setLastInputSignature] = useState("");
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaRobot, FaComments, FaTimes, FaPaperPlane, FaSpinner, FaLightbulb, FaMicrophone, 
          FaThumbsUp, FaThumbsDown, FaRegSmile, FaRegCopy, FaVolumeUp } from 'react-icons/fa';
 import { useTranslation } from '../utils/TranslationContext';
-import { knowledgeBase, extendedKnowledgeBase, fuzzyMatch } from '../data/chatbotKnowledgeBase';
+import { knowledgeBase, extendedKnowledgeBase } from '../data/chatbotKnowledgeBase';
 import { preprocessText, calculateSimilarity, detectIntent, extractEntities, generateContextualResponse } from '../utils/nlpUtils';
 
 const ChatBot = () => {
@@ -11,7 +11,6 @@ const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
   // Start with greeting visible by default
   const [showGreeting, setShowGreeting] = useState(true);
-  const [hasShownGreeting, setHasShownGreeting] = useState(false);
   const [messages, setMessages] = useState(() => {
     const savedMessages = localStorage.getItem('kspChatHistory');
     if (savedMessages) {
@@ -82,6 +81,11 @@ const ChatBot = () => {
   const chatContainerRef = useRef(null);
   const audioRef = useRef(new Audio('/sounds/message-received.mp3'));
 
+  // Define scrollToBottom before using it in useEffect
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     if (messages.length > 0) {
       const uniqueMessages = Array.from(
@@ -97,7 +101,7 @@ const ChatBot = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -176,17 +180,12 @@ const ChatBot = () => {
       setTimeout(() => {
         console.log('Hiding greeting animation');
         setShowGreeting(false);
-        setHasShownGreeting(true);
         localStorage.setItem('kspGreetingShown', 'true');
       }, 8000);
     }, 1000);
     
     return () => clearTimeout(timer);
   }, []); // Empty dependency array means this runs once on mount
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
 
   const toggleChat = useCallback(() => {
     const newIsOpen = !isOpen;
@@ -212,20 +211,7 @@ const ChatBot = () => {
     setTypingTimeout(timeout);
   }, [typingTimeout]);
 
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  }, []);
-
-  const getTimeOfDay = useCallback(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return t("Good morning", "chatbot");
-    if (hour < 18) return t("Good afternoon", "chatbot");
-    return t("Good evening", "chatbot");
-  }, [t]);
-
+  // Move these function definitions above their usage
   const extractUserName = useCallback((message) => {
     const namePatterns = [
       /my name is (\w+)/i,
@@ -266,7 +252,7 @@ const ChatBot = () => {
     });
   }, []);
 
-  // Enhanced findBotResponse function using NLP
+  // Now findBotResponse can use these functions in its dependency array
   const findBotResponse = useCallback((userMessage) => {
     const normalizedMessage = userMessage.toLowerCase();
     const possibleName = extractUserName(userMessage);
@@ -283,6 +269,7 @@ const ChatBot = () => {
     console.log('User intent:', userIntent, 'Entities:', entities);
 
     // Pre-process the user message for NLP matching
+    // eslint-disable-next-line no-unused-vars
     const processedUserMessage = preprocessText(userMessage).join(' ');
     
     // Handle basic intents first
@@ -370,42 +357,7 @@ const ChatBot = () => {
     return t("I'm not sure I understand. Could you please rephrase your question? I can help with information about our products, sustainability practices, ordering process, or company information.", "chatbot");
   }, [conversationContext, extractUserName, isNewVisitorGreeting, t, updateConversationContext]);
 
-  const getMessageGroups = useCallback(() => {
-    const groups = [];
-    let currentGroup = { date: null, messages: [] };
-
-    messages.forEach(message => {
-      try {
-        const messageTimestamp = message.timestamp instanceof Date ? 
-          message.timestamp : new Date(message.timestamp);
-          
-        if (isNaN(messageTimestamp.getTime())) {
-          console.error('Invalid timestamp for message:', message);
-          return;
-        }
-        
-        const messageDate = messageTimestamp.toLocaleDateString();
-        
-        if (!currentGroup.date) {
-          currentGroup.date = messageDate;
-        } else if (currentGroup.date !== messageDate) {
-          groups.push({ ...currentGroup });
-          currentGroup = { date: messageDate, messages: [] };
-        }
-        
-        currentGroup.messages.push(message);
-      } catch (error) {
-        console.error('Error processing message:', error);
-      }
-    });
-    
-    if (currentGroup.date && currentGroup.messages.length > 0) {
-      groups.push(currentGroup);
-    }
-    
-    return groups;
-  }, [messages]);
-
+  // Define handleSendMessage before it's used in handleKeyDown
   const handleSendMessage = useCallback(() => {
     if (!newMessage || newMessage.trim() === '') return;
     
@@ -464,8 +416,51 @@ const ChatBot = () => {
       setMessages(prevMessages => [...prevMessages, botResponse]);
       setIsTyping(false);
     }, 500 + Math.random() * 500); // Reduced response time for better responsiveness
-  }, [findBotResponse, newMessage, messages]);
-  
+  }, [findBotResponse, newMessage, messages, t]); // Added 't' dependency
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }, [handleSendMessage]);
+
+  const getMessageGroups = useCallback(() => {
+    const groups = [];
+    let currentGroup = { date: null, messages: [] };
+
+    messages.forEach(message => {
+      try {
+        const messageTimestamp = message.timestamp instanceof Date ? 
+          message.timestamp : new Date(message.timestamp);
+          
+        if (isNaN(messageTimestamp.getTime())) {
+          console.error('Invalid timestamp for message:', message);
+          return;
+        }
+        
+        const messageDate = messageTimestamp.toLocaleDateString();
+        
+        if (!currentGroup.date) {
+          currentGroup.date = messageDate;
+        } else if (currentGroup.date !== messageDate) {
+          groups.push({ ...currentGroup });
+          currentGroup = { date: messageDate, messages: [] };
+        }
+        
+        currentGroup.messages.push(message);
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
+    });
+    
+    if (currentGroup.date && currentGroup.messages.length > 0) {
+      groups.push(currentGroup);
+    }
+    
+    return groups;
+  }, [messages]);
+
   const handleSuggestedQuestion = useCallback((question) => {
     if (!question) return;
     
@@ -519,7 +514,7 @@ const ChatBot = () => {
       setMessages(prevMessages => [...prevMessages, botResponse]);
       setIsTyping(false);
     }, 1000 + Math.random() * 1000);
-  }, [findBotResponse, messages]);
+  }, [findBotResponse, messages, t]);
 
   const formatTimestamp = useCallback((timestamp) => {
     try {
@@ -621,7 +616,7 @@ const ChatBot = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [messages]);
+  }, [messages]); // Removed 't' dependency
 
   const clearChatHistory = useCallback(() => {
     if (window.confirm(t("Are you sure you want to clear the chat history?", "chatbot"))) {
@@ -644,7 +639,7 @@ const ChatBot = () => {
       
       localStorage.removeItem('kspChatHistory');
     }
-  }, [t]);
+  }, [t]); // Added 't' dependency
 
   const copyToClipboard = useCallback((text) => {
     if (!text) return;
@@ -776,7 +771,6 @@ const ChatBot = () => {
           onClick={() => {
             localStorage.removeItem('kspGreetingShown');
             localStorage.removeItem('kspChatOpenCount');
-            setHasShownGreeting(false);
             console.log('Manually showing greeting');
             setShowGreeting(true);
             setTimeout(() => setShowGreeting(false), 8000);

@@ -81,7 +81,6 @@ const translations = {
       "Follow Us": "எங்களை பின்தொடருங்கள்",
       "Subscribe to Newsletter": "செய்திமடலுக்கு பதிவு செய்யுங்கள்",
       "Enter email": "மின்னஞ்சலை உள்ளிடவும்",
-      "Subscribe": "பதிவு செய்",
       "Copyright": "பதிப்புரிமை"
     },
     home: {
@@ -152,13 +151,13 @@ const translations = {
       "Quality Approval Rate": "தர ஒப்புதல் விகிதம்",
       "Certified Quality Management": "சான்றளிக்கப்பட்ட தர மேலாண்மை",
       "Quality Monitoring": "தர கண்காணிப்பு",
-      "What Our Clients Say": "எங்கள் வாடிக்கையாளர்கள் என்ன சொல்கிறார்கள்",
+      "What Clients Say": "வாடிக்கையாளர்கள் என்ன சொல்கிறார்கள்",
       "KSP Yarns has consistently delivered exceptional quality products that meet our high standards.": "KSP நூல்கள் எங்கள் உயர் தரத்தை பூர்த்தி செய்யும் சிறந்த தரமான தயாரிப்புகளை தொடர்ந்து வழங்கியுள்ளது.",
       "Their commitment to sustainability aligns perfectly with our values. Excellent service!": "நிலைத்தன்மை மீதான அவர்களின் அர்ப்பணிப்பு எங்கள் மதிப்புகளுடன் முற்றிலும் ஒத்துப்போகிறது. சிறந்த சேவை!",
       "The innovation and quality control at KSP Yarns is unmatched in the industry.": "KSP நூல்களில் உள்ள புதுமை மற்றும் தரக்கட்டுப்பாடு தொழில் துறையில் ஈடு இணையற்றது.",
-      "Our Commitment to Sustainability": "நிலைத்தன்மை மீதான எங்கள் உறுதிப்பாடு",
+      "Our Sustainability Commitment": "நிலைத்தன்மை மீதான எங்கள் உறுதிப்பாடு",
       "At KSP Yarns, we are dedicated to reducing our environmental footprint through innovative practices and sustainable materials.": "KSP நூல்களில், புதுமையான நடைமுறைகள் மற்றும் நிலையான பொருட்கள் மூலம் எங்கள் சுற்றுச்சூழல் தடத்தைக் குறைப்பதில் நாங்கள் அர்ப்பணிப்புடன் உள்ளோம்.",
-      "Learn More About Our Initiatives": "எங்கள் முயற்சிகளைப் பற்றி மேலும் அறிக",
+      "Learn About Initiatives": "எங்கள் முயற்சிகளைப் பற்றி அறிக",
       "Fashion Limited": "பேஷன் லிமிடெட்",
       "Eco Textiles": "எக்கோ டெக்ஸ்டைல்ஸ்",
       "Global Fabrics": "குளோபல் பேப்ரிக்ஸ்"
@@ -320,7 +319,7 @@ const translations = {
       "Medium Creativity (0.3-0.7)": "நடுத்தர படைப்பாற்றல் (0.3-0.7)",
       "Balanced suggestions with some unique alternatives you might not have considered.": "நீங்கள் கருத்தில் கொள்ளாத சில தனித்துவமான மாற்றுகளுடன் சமநிலை பரிந்துரைகள்.",
       "High Creativity (0.7-1.0)": "உயர் படைப்பாற்றல் (0.7-1.0)",
-      "Surprising and unconventional recommendations to spark new ideas!": "புதிய யோசனைகளைத் தூண்ட ஆச்சரியமான மற்றும் மரபுசாரா பரிந்துரைகள்!",
+      "Surprising and unconventional recommendations to spark new ideas!": "புதிய யோசனைகளைத் தூண்ட ஆச்சரியமான மற்றும் மரபுச்சாரா பரிந்துரைகள்!",
       "User Reviews": "பயனர் மதிப்புரைகள்",
       "Great quality yarn! Perfect for my knitting projects.": "சிறந்த தரமான நூல்! என் பின்னல் திட்டங்களுக்கு சரியாக பொருந்துகிறது.",
       "The colors are vibrant and the yarn is very durable.": "வண்ணங்கள் துடிப்பானவை மற்றும் நூல் மிகவும் உறுதியானது.",
@@ -343,8 +342,8 @@ const translations = {
   }
 };
 
-// Helper function to get nested translation
-const getTranslation = (obj, key) => {
+// Helper function to get nested translation - export it directly here
+export const getTranslation = (obj, key) => {
   // If the path is a string, split it into an array
   const path = typeof key === 'string' ? key.split('.') : key;
   

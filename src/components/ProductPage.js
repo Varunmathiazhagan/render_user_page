@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown, FaChevronUp, FaFilter } from "react-icons/fa";
+import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown } from "react-icons/fa";
 import { motion, AnimatePresence, useAnimation, useScroll } from "framer-motion";
 import useProducts from "../hooks/useProducts";
 import { fallbackImageBase64 } from '../assets/fallback';
@@ -281,13 +281,11 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
     availableColors
   } = useProducts();
 
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const controls = useAnimation();
   const [imageError, setImageError] = useState({});
-  const [favorites, setFavorites] = useState(new Set());
   const [wishlistItems, setWishlistItems] = useState(new Set());
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const navigate = useNavigate();
@@ -341,19 +339,6 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
       ...prev,
       [productId]: true
     }));
-  };
-
-  const toggleFavorite = (e, productId) => {
-    e.stopPropagation();
-    setFavorites(prev => {
-      const newFavorites = new Set(prev);
-      if (newFavorites.has(productId)) {
-        newFavorites.delete(productId);
-      } else {
-        newFavorites.add(productId);
-      }
-      return newFavorites;
-    });
   };
 
   const toggleColor = (color) => {

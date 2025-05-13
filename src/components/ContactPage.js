@@ -669,7 +669,7 @@ const ContactPage = () => {
                     variants={itemVariants} 
                     whileHover={{ scale: 1.03 }} 
                     className={`flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r ${contact.bgColor} cursor-pointer`} 
-                    onClick={() => window.location.href = `tel:${contact.number}`}
+                    onClick={contact.type === t('Office', 'contact') ? handlePhoneClick : () => window.location.href = `tel:${contact.number}`}
                   >
                     <div className={`p-3 rounded-full ${contact.iconColor} bg-white`}><contact.icon className="text-xl" /></div>
                     <div><p className="font-semibold text-gray-800">{contact.type}</p><p className="text-gray-600">{contact.number}</p></div>

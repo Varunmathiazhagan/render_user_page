@@ -5,7 +5,7 @@ import {
   FaCamera, FaSave, FaTimes, FaPhone, FaMapMarkerAlt, FaBell,
   FaExclamationTriangle, FaSpinner, FaKey, FaTrash, FaDownload,
   FaSignOutAlt, FaChartPie, FaCheck, FaLock, FaHistory,
-  FaShoppingBag, FaBox, FaMoneyBillWave, FaTruck, FaEye, FaShoppingCart,
+  FaShoppingBag, FaBox, FaMoneyBillWave, FaEye, FaShoppingCart,
   FaHeart, FaTrashAlt, FaPlus, FaCartPlus
 } from "react-icons/fa";
 import axios from "axios";
