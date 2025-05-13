@@ -50,7 +50,7 @@ const Login = ({ setIsAuthenticated }) => {
       };
 
       console.log("Attempting login with:", loginData.email);
-      const response = await axios.post("http://localhost:5008/login", loginData);
+      const response = await axios.post("https://render-user-page.onrender.com/login", loginData);
 
       if (response.data && response.data.token) {
         const tokenExpiry = new Date();
@@ -83,7 +83,7 @@ const Login = ({ setIsAuthenticated }) => {
 
       console.log("Google credential received, sending to backend for sign in...");
       const response = await axios.post(
-        "http://localhost:5008/oauth/google",
+        "https://render-user-page.onrender.com/oauth/google",
         { 
           token: credential,
           action: "signin" // Explicitly state this is a signin attempt

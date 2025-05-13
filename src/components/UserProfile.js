@@ -39,7 +39,7 @@ const UserProfile = () => {
   const [wishlistError, setWishlistError] = useState(null);
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'wishlist'
 
-  const API_URL = "http://localhost:5008";
+  const API_URL = "https://render-user-page.onrender.com";
 
   const fetchUserProfile = async () => {
     setLoading(true);

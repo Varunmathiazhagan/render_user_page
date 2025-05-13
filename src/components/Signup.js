@@ -106,7 +106,7 @@ const Signup = ({ setIsAuthenticated }) => {
       };
 
       console.log("Attempting signup with:", signupData);
-      const response = await axios.post("http://localhost:5008/signup", signupData);
+      const response = await axios.post("https://render-user-page.onrender.com/signup", signupData);
 
       if (response.data && response.data.token) {
         const tokenExpiry = new Date();
@@ -139,7 +139,7 @@ const Signup = ({ setIsAuthenticated }) => {
 
       console.log("Google credential received, sending to backend for signup...");
       const response = await axios.post(
-        "http://localhost:5008/oauth/google",
+        "https://render-user-page.onrender.com/oauth/google",
         { 
           token: credential,
           action: "signup" // Explicitly state this is a signup attempt
