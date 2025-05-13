@@ -290,16 +290,16 @@ const Footer = () => {
           </motion.div>
         </div>
 
-        {/* Enhanced Copyright with year update animation */}
+        {/* Enhanced Copyright with year update animation and creator credits */}
         <motion.div
           variants={itemVariants}
-          className="mt-12 pt-8 border-t border-gray-700/50 text-center"
+          className="mt-12 pt-8 border-t border-gray-700/50 text-center space-y-2"
         >
           <motion.p 
-            className="text-gray-400 text-sm"
+            className="text-gray-300 text-sm"
             whileHover={{ scale: 1.02 }}
           >
-            &copy; {new Date().getFullYear()} {t("KSP Yarns", "footer")}. {t("All rights reserved.", "footer")} {t("Made with", "footer")}{' '}
+            © 2025 KSP Yarns. All rights reserved. Made with{' '}
             <motion.span 
               initial={{ scale: 1 }}
               animate={{ 
@@ -315,8 +315,40 @@ const Footer = () => {
             >
               ❤️
             </motion.span>{' '}
-            {t("for quality yarns.", "footer")}
+            for quality yarns.
           </motion.p>
+          
+          {/* Animated creator credits */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ 
+              duration: 0.8,
+              delay: 0.5,
+              ease: "easeOut"
+            }}
+            className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0"
+          >
+            <span className="text-gray-400 text-sm mr-2">Designed & Created by</span>
+            <div className="flex flex-wrap justify-center gap-x-3">
+              {["Niranjan", "Nithish", "Varun"].map((name, index) => (
+                <motion.span
+                  key={name}
+                  className="text-sm bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent font-medium"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 + index * 0.2 }}
+                  whileHover={{ 
+                    scale: 1.2,
+                    textShadow: "0 0 8px rgba(79, 209, 197, 0.8)",
+                    color: "#4fd1c5"
+                  }}
+                >
+                  {name}
+                </motion.span>
+              ))}
+            </div>
+          </motion.div>
         </motion.div>
       </motion.div>
     </footer>

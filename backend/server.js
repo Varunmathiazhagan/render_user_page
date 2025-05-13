@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const multer = require("multer"); // Add multer dependency
+const PDFDocument = require("pdfkit"); // Add PDFKit dependency
 
 const app = express();
 const PORT = 5008;
@@ -1522,6 +1523,125 @@ setInterval(async () => {
     console.error("Failed to delete old expenses:", err.message);
   }
 }, 24 * 60 * 60 * 1000); // Run daily
+
+// Add order timeline endpoint
+app.get("/api/orders/:id/timeline", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const timeline = [
+      { status: "Order Placed", timestamp: order.createdAt },
+      { status: "Processing", timestamp: order.updatedAt },
+      ...(order.orderStatus === "shipped" ? [{ status: "Shipped", timestamp: new Date() }] : []),
+      ...(order.orderStatus === "delivered" ? [{ status: "Delivered", timestamp: new Date() }] : []),
+    ];
+
+    res.json({ success: true, timeline });
+  } catch (error) {
+    console.error("Error fetching order timeline:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Add order notes functionality
+app.post("/api/orders/:id/notes", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    if (!note) return res.status(400).json({ message: "Note is required" });
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    order.notes = order.notes ? [...order.notes, note] : [note];
+    await order.save();
+
+    res.json({ success: true, message: "Note added successfully", notes: order.notes });
+  } catch (error) {
+    console.error("Error adding note:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Export orders to CSV
+app.get("/api/orders/export/csv", authenticateToken, async (req, res) => {
+  try {
+    const orders = await Order.find();
+    const csvHeaders = "Order ID,User Email,Total Price,Order Status\n";
+    const csvRows = orders
+      .map(
+        (order) =>
+          `${order._id},${order.userEmail},${order.totalPrice},${order.orderStatus}`
+      )
+      .join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=orders.csv");
+    res.send(csvHeaders + csvRows);
+  } catch (error) {
+    console.error("Error exporting orders to CSV:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Export orders to PDF
+app.get("/api/orders/export/pdf", authenticateToken, async (req, res) => {
+  try {
+    const orders = await Order.find();
+    const doc = new PDFDocument();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=orders.pdf");
+
+    doc.pipe(res);
+    doc.fontSize(16).text("Orders Report", { align: "center" });
+    doc.moveDown();
+
+    orders.forEach((order) => {
+      doc
+        .fontSize(12)
+        .text(
+          `Order ID: ${order._id}, User Email: ${order.userEmail}, Total Price: ${order.totalPrice}, Status: ${order.orderStatus}`
+        );
+      doc.moveDown();
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error("Error exporting orders to PDF:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Print order functionality
+app.get("/api/orders/:id/print", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const doc = new PDFDocument();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=order_${id}.pdf`);
+
+    doc.pipe(res);
+    doc.fontSize(16).text(`Order Details - ${id}`, { align: "center" });
+    doc.moveDown();
+    doc.fontSize(12).text(`User Email: ${order.userEmail}`);
+    doc.text(`Total Price: ${order.totalPrice}`);
+    doc.text(`Order Status: ${order.orderStatus}`);
+    doc.text(`Order Items:`);
+    order.orderItems.forEach((item) => {
+      doc.text(`- ${item.name} (x${item.quantity}): $${item.price}`);
+    });
+    doc.end();
+  } catch (error) {
+    console.error("Error printing order:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
 // Start Server
 app.listen(PORT, () => console.log(`Server is running on port: ${PORT}`));

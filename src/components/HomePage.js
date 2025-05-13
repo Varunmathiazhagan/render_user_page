@@ -280,11 +280,93 @@ const SustainabilitySection = () => {
   );
 };
 
+// Revised SparkleEffect Component with adjusted timing and reduced particles
+const SparkleEffect = () => {
+  const sparkleCount = 35; // Reduced from 60 to 35 particles
+  
+  const createSparkles = () => {
+    return Array.from({ length: sparkleCount }).map((_, i) => {
+      const size = Math.random() * 12 + 6;
+      const left = `${Math.random() * 100}%`;
+      const top = `${Math.random() * 30}%`;
+      const duration = Math.random() * 5 + 4; // Increased from 3+2 to 5+4 (4-9 seconds)
+      const delay = Math.random() * 5; // Increased delay spread for more varied timing
+      const isSquare = Math.random() > 0.6;
+      const colors = [
+        "from-blue-400 to-cyan-400", 
+        "from-cyan-400 to-blue-500",
+        "from-blue-300 to-indigo-400",
+        "from-indigo-300 to-purple-400",
+        "from-blue-200 to-blue-500"
+      ];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      return (
+        <div 
+          key={`sparkle-${i}`}
+          className="absolute"
+          style={{
+            left,
+            top,
+            zIndex: -1,
+            animation: `fall ${duration}s linear ${delay}s infinite`
+          }}
+        >
+          {isSquare ? (
+            <div 
+              className={`bg-gradient-to-br ${color} rotate-45 animate-pulse`}
+              style={{ 
+                width: `${size}px`, 
+                height: `${size}px`,
+                boxShadow: `0 0 ${size/1.5}px ${size/2}px rgba(59, 130, 246, 0.8)`,
+                borderRadius: '2px'
+              }}
+            />
+          ) : (
+            <div 
+              className={`bg-gradient-to-br ${color} rounded-full animate-pulse`}
+              style={{ 
+                width: `${size}px`, 
+                height: `${size}px`,
+                boxShadow: `0 0 ${size/1.5}px ${size/2}px rgba(59, 130, 246, 0.7)`,
+              }}
+            />
+          )}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <>
+      <style jsx global>{`
+        @keyframes fall {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+            transform: translateY(50vh) rotate(180deg) scale(1.2);
+          }
+          100% {
+            transform: translateY(100vh) rotate(360deg) scale(0.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: -10 }}>
+        {createSparkles()}
+      </div>
+    </>
+  );
+};
+
 // New Product Showcase Section with image gallery
 const ProductShowcaseSection = () => {
   const { t } = useTranslation() // Add translation hook
   const [ref, inView] = useInView({
-    triggerOnce: true,
+    triggerOnce: false, // Changed to false to restart animation when revisiting
     threshold: 0.1,
   })
 
@@ -314,21 +396,31 @@ const ProductShowcaseSection = () => {
   return (
     <motion.section
       ref={ref}
-      className="py-16 px-6 md:px-16"
+      className="py-16 px-6 md:px-16 relative overflow-hidden"
       initial={{ opacity: 0, y: 20 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6 }}
     >
-      <div className="text-center mb-12">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
+      {/* Always render SparkleEffect but control animation with inView */}
+      {inView && <SparkleEffect />}
+      
+      <div className="text-center mb-12 relative" style={{ zIndex: 1 }}>
+        <motion.h2 
+          className="text-3xl md:text-4xl font-bold mb-4"
+          animate={inView ? { 
+            scale: [0.9, 1.05, 1],
+            textShadow: ["0 0 0px rgba(59, 130, 246, 0)", "0 0 10px rgba(59, 130, 246, 0.3)", "0 0 0px rgba(59, 130, 246, 0)"]
+          } : {}}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+        >
           {t("Our Premium Products", "home")}
-        </h2>
+        </motion.h2>
         <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
           {t("Explore our wide range of high-quality yarns designed for various applications", "home")}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative" style={{ zIndex: 1 }}>
         {products.map((product, index) => (
           <motion.div
             key={`product-${index}`}
@@ -371,7 +463,7 @@ const ProductShowcaseSection = () => {
         ))}
       </div>
       
-      <div className="text-center mt-10">
+      <div className="text-center mt-10 relative" style={{ zIndex: 1 }}>
         <Link to="/products">
           <motion.button
             className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-8 py-3 rounded-full font-semibold text-lg hover:shadow-lg hover:shadow-blue-500/30 transition duration-300 inline-flex items-center"
@@ -429,8 +521,6 @@ const ProcessSection = () => {
       <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
         {t("Our Manufacturing Excellence", "home")}
       </h2>
-      
-      {/* ...existing code... */}
       
       <div className="relative">
         {/* Connect line */}
