@@ -47,7 +47,8 @@
     "web-vitals": "^4.2.4",
     "wink-sentiment": "^5.0.2",
     "ajv": "^6.12.6",
-    "ajv-keywords": "^3.5.2"
+    "ajv-keywords": "^3.5.2",
+    "@remix-run/node": "^1.0.0"
   },
   "scripts": {
     "start": "react-scripts start",
