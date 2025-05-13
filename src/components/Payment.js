@@ -143,7 +143,7 @@ const Payment = ({
       await checkRazorpayReady();
       const amount = totalPrice * 100;
       const options = {
-        key: "rzp_test_mUZPelBGqqVPrG",
+        key: "rzp_test_59tiIuPnfUGOrp",
         amount,
         currency: "INR",
         name: "Fancy Store",

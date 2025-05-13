@@ -19,7 +19,7 @@ const JWT_EXPIRATION = "1d"; // 1 day
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://kspyarnsadmin.vercel.app', 'http://localhost:5173', '*'],
+  origin: ['https://ksp-gamma.vercel.app', 'https://kspyarnsadmin.vercel.app', 'http://localhost:5173', '*'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
