@@ -121,7 +121,7 @@ export const findBestMatch = (query, documents, threshold = 0.2) => {
   // Calculate similarity scores for each document
   const scores = documents.map(doc => ({
     document: doc,
-    similarity: calculateSimilarity(query, doc.text || doc.keywords?.join(' ') || '')
+    similarity: calculateSimilarity(processedQuery, doc.text || doc.keywords?.join(' ') || '')
   }));
   
   // Sort by similarity score (descending)
@@ -219,7 +219,7 @@ export const detectIntent = (text) => {
 
 // Generate contextual responses based on conversation history
 export const generateContextualResponse = (query, matchedResponse, conversationContext) => {
-  const intent = detectIntent(query);
+  // Removed unused intent variable
   const entities = extractEntities(query);
   
   // If we have a specific response, customize it based on context
