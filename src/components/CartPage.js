@@ -16,7 +16,7 @@ import {
   FaTimes, // Added missing FaTimes icon
 } from "react-icons/fa";
 import { useState, useEffect } from "react";
-import axios from "axios";
+// Removing axios since it's not used in this component directly
 import Payment from "./Payment"; // Import the new Payment component
 import { jsPDF } from "jspdf";
 import "jspdf-autotable"; // Add this import for table support in PDF
@@ -37,6 +37,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   const currentStepIndex = steps.indexOf(step);
 
   const [savedOrder, setSavedOrder] = useState(null);
+  // Using setOrderProcessingError in new handleSuccessfulPayment function
   const [orderProcessingError, setOrderProcessingError] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [progressAnimation, setProgressAnimation] = useState(0);
@@ -77,20 +78,21 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
     }
   }, [step, orderReference]);
 
-  // Handle successful payment
+  // Handle successful payment - Modified to use setOrderProcessingError
   const handleSuccessfulPayment = (order, method) => {
     setSavedOrder(order);
     setPaymentMethod(method); // Store the payment method
+    if (!order) {
+      setOrderProcessingError("Order was processed but could not be saved. Please contact support with your reference number.");
+    }
     setStep("confirmation");
   };
 
-  // Animation variants
-  const getIconColor = (stepName) => {
-    const stepIndex = steps.indexOf(stepName);
-    return stepIndex <= currentStepIndex ? "text-blue-600" : "text-gray-500";
+  // Animation variants - removing unused ones and keeping the ones we need
+  const spinnerVariants = { 
+    spin: { rotate: 360, transition: { repeat: Infinity, duration: 1 } }
   };
-
-  const spinnerVariants = { spin: { rotate: 360 } };
+  
   const emptyCartVariants = {
     hidden: { opacity: 0, scale: 0.8 },
     visible: { opacity: 1, scale: 1, transition: { duration: 0.5 } },
@@ -111,14 +113,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
       transition: { duration: 3, repeat: Infinity, ease: "easeInOut", times: [0, 0.5, 1] },
     },
   };
-  const successAnimation = {
-    initial: { scale: 0 },
-    animate: {
-      scale: [0, 1.2, 1],
-      rotate: [0, 15, -15, 0],
-      transition: { duration: 0.8, ease: "easeOut" },
-    },
-  };
+  
   const staggerContainer = {
     animate: { transition: { staggerChildren: 0.07 } },
   };
@@ -131,6 +126,8 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
       transition: { type: "spring", stiffness: 100, damping: 10 },
     },
   };
+  
+  // Define confetti animation that was missing but used in renderConfetti
   const confettiAnimation = {
     initial: { opacity: 0, scale: 0 },
     animate: {
@@ -141,6 +138,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
       transition: { duration: 2, ease: "easeOut" },
     },
   };
+  
   const cartItemVariants = {
     initial: { opacity: 0, x: -50 },
     animate: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 100 } },
@@ -193,7 +191,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
     return (
       <motion.div className="text-center mt-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <motion.div
-          animate={{ rotate: 360, scale: [1, 1.2, 1], transition: { duration: 2, repeat: Infinity } }}
+          animate={spinnerVariants.spin}
           className="text-6xl mx-auto text-blue-500 mb-4"
         >
           <FaSpinner />
@@ -641,20 +639,18 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
           return (
             <motion.div
               key={i}
-              initial={{ top: "-20px", left, opacity: 1 }}
-              animate={{
-                top: `${Math.random() * 150 + 100}vh`,
-                left: `calc(${left} + ${(Math.random() - 0.5) * 20}vw)`,
-                opacity: 0,
-                rotate: Math.random() * 360,
-              }}
-              transition={{ duration: Math.random() * 2.5 + 2.5, delay, ease: "easeOut" }}
+              initial="initial"
+              animate="animate"
+              variants={confettiAnimation}
               style={{
                 position: "absolute",
+                top: "-20px",
+                left,
                 width: `${size}rem`,
                 height: `${size / 2}rem`,
                 backgroundColor: color,
                 borderRadius: "2px",
+                transition: { duration: Math.random() * 2.5 + 2.5, delay, ease: "easeOut" }
               }}
             />
           );

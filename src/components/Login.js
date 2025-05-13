@@ -9,7 +9,6 @@ import {
   FaSignInAlt,
   FaSpinner,
   FaExclamationTriangle,
-  FaGoogle
 } from "react-icons/fa";
 
 const Login = ({ setIsAuthenticated }) => {

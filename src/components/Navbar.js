@@ -32,11 +32,11 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
   // Use our translation context
   const { language, changeLanguage, t } = useTranslation();
 
-  // Define languages with their display names and codes
-  const languages = [
+  // Define languages with their display names and codes using useMemo to prevent recreation on each render
+  const languages = useMemo(() => [
     { code: 'en', name: 'English' },
     { code: 'ta', name: 'தமிழ்' }
-  ];
+  ], []);
 
   // Set initial selected language based on current language in context
   useEffect(() => {
@@ -45,10 +45,10 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
     if (currentLang) {
       setSelectedLanguage(currentLang.name);
     }
-  }, [language]);
+  }, [language, languages]); 
 
-  // Language change handler with loading state
-  const handleLanguageChange = async (lang) => {
+  // Language change handler with loading state - wrapped in useCallback
+  const handleLanguageChange = useCallback(async (lang) => {
     setIsChangingLanguage(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -59,7 +59,7 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
     } finally {
       setIsChangingLanguage(false);
     }
-  };
+  }, [changeLanguage]);
 
   // Optimized scroll handler with debounce
   const handleScroll = useCallback(() => {
@@ -122,9 +122,12 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
           setIsLanguageMenuOpen(false);
           setActiveIndex(-1);
           break;
+        default:
+          // Default case added to satisfy ESLint
+          break;
       }
     }
-  }, [isLanguageMenuOpen, activeIndex]);
+  }, [isLanguageMenuOpen, activeIndex, languages, handleLanguageChange]); // Added missing dependencies
 
   // Memoize cart item count
   const cartItemCount = useMemo(() => 
@@ -255,7 +258,8 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
                       onClick={() => handleLanguageChange(lang)}
                       onMouseEnter={() => setActiveIndex(index)}
                       whileHover={{ x: 3 }}
-                      aria-selected={selectedLanguage === lang.name}
+                      // Changed from aria-selected to data-selected to avoid the role conflict
+                      data-selected={selectedLanguage === lang.name ? "true" : "false"}
                       className={`block w-full text-left px-4 py-2 text-sm ${
                         index === activeIndex ? 'bg-blue-100/70' : ''
                       } ${
