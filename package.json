@@ -44,6 +44,7 @@
     "react-virtuoso": "^4.12.5",
     "styled-components": "^6.1.15",
     "three": "^0.173.0",
+    "typescript": "^4.4.4",
     "web-vitals": "^4.2.4",
     "wink-sentiment": "^5.0.2"
   },
