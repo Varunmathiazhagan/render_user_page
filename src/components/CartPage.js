@@ -30,6 +30,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
     addressLine1: "",
     city: "",
     postalCode: "",
+    phone: "", // Add phone field
   });
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -167,20 +168,20 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   // Updated handleShippingInfoSubmit - no need to validate email since we use the user's email
   const handleShippingInfoSubmit = (e) => {
     e.preventDefault();
-    const { fullName, addressLine1, city, postalCode } = shippingInfo;
-    
+    const { fullName, addressLine1, city, postalCode, phone } = shippingInfo;
+
     // Basic validation for required fields
-    if (!fullName || !addressLine1 || !city || !postalCode) {
+    if (!fullName || !addressLine1 || !city || !postalCode || !phone) {
       alert("Please fill in all fields.");
       return;
     }
-    
+
     // If user is not signed in, they can't proceed (we need their email)
     if (!user || !user.email) {
       alert("Please sign in to continue with checkout.");
       return;
     }
-    
+
     setStep("delivery");
   };
 
@@ -397,6 +398,19 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
             placeholder="John Doe"
             value={shippingInfo.fullName}
             onChange={(e) => setShippingInfo({ ...shippingInfo, fullName: e.target.value })}
+            className="w-full p-3 border rounded-md focus:outline-none transition-all duration-200"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+          <motion.input
+            variants={formInputVariants}
+            whileFocus="focus"
+            type="tel"
+            placeholder="9876543210"
+            value={shippingInfo.phone}
+            onChange={(e) => setShippingInfo({ ...shippingInfo, phone: e.target.value })}
             className="w-full p-3 border rounded-md focus:outline-none transition-all duration-200"
             required
           />
