@@ -9,6 +9,7 @@ const PDFDocument = require("pdfkit"); // Add PDFKit dependency
 const twilio = require('twilio');
 
 const app = express();
+
 const PORT = 5008;
 const JWT_SECRET = "4953546c308be3088b28807c767bd35e99818434d130a588e5e6d90b6d1d326e";
 const GOOGLE_CLIENT_ID = "435475456119-dsajbk8ujprqvig0nua0g9qfmmks5v2j.apps.googleusercontent.com";
@@ -1669,6 +1670,12 @@ const sendSms = async (to, message) => {
     console.log(`SMS sent to ${to}`);
   } catch (error) {
     console.error(`Failed to send SMS to ${to}:`, error.message);
+    if (error.code) {
+      console.error(`Twilio Error Code: ${error.code}`);
+    }
+    if (error.moreInfo) {
+      console.error(`More Info: ${error.moreInfo}`);
+    }
   }
 };
 
