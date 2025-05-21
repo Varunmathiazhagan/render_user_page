@@ -34,7 +34,7 @@ mongoose
   .then(async () => {
     console.log("MongoDB connected");
     
-    // Update the counter document to sync with highest product id
+   
     const lastProduct = await Product.findOne({}).sort({ id: -1 });
     const maxId = lastProduct ? lastProduct.id : 0;
     await Counter.findByIdAndUpdate(
@@ -44,7 +44,7 @@ mongoose
     );
     console.log(`Counter set to ${maxId}`);
     
-    // Ensure unique index on product id
+   
     try {
       await mongoose.connection.collection("products").dropIndex("id_1");
       console.log("Dropped existing index");

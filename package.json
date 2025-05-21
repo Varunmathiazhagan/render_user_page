@@ -8,6 +8,8 @@
     "@react-oauth/google": "^0.12.1",
     "@react-three/drei": "^9.121.5",
     "@react-three/fiber": "^8.17.14",
+    "ajv": "^6.12.6",
+    "ajv-keywords": "^3.5.2",
     "axios": "^1.8.3",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
@@ -26,6 +28,7 @@
     "natural": "^8.0.1",
     "next": "^15.1.6",
     "pdfkit": "^0.17.1",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-error-boundary": "^5.0.0",
@@ -45,9 +48,7 @@
     "styled-components": "^6.1.15",
     "three": "^0.173.0",
     "web-vitals": "^4.2.4",
-    "wink-sentiment": "^5.0.2",
-    "ajv": "^6.12.6",
-    "ajv-keywords": "^3.5.2"
+    "wink-sentiment": "^5.0.2"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -74,10 +75,10 @@
     ]
   },
   "devDependencies": {
+    "@remix-run/dev": "^1.0.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^4.9.5",
-    "@remix-run/dev": "^1.0.0"
+    "typescript": "^4.9.5"
   }
 }
