@@ -1716,19 +1716,28 @@ app.get("/api/orders/:id/print", authenticateToken, async (req, res) => {
 // Function to send SMS
 const sendSms = async (to, message) => {
   try {
+    // Ensure the phone number is in E.164 format
+    const formattedNumber = to.startsWith('+') ? to : `+91${to}`;
     await client.messages.create({
       body: message,
       from: twilioPhoneNumber,
-      to,
+      to: formattedNumber,
     });
-    console.log(`SMS sent to ${to}`);
+    console.log(`SMS sent to ${formattedNumber}`);
   } catch (error) {
     console.error(`Failed to send SMS to ${to}:`, error.message);
-    if (error.code) {
-      console.error(`Twilio Error Code: ${error.code}`);
-    }
-    if (error.moreInfo) {
+    if (error.code === 21408) {
+      console.error(
+        `Twilio Error Code: ${error.code} - Permission to send SMS to this region is not enabled.`
+      );
       console.error(`More Info: ${error.moreInfo}`);
+    } else {
+      if (error.code) {
+        console.error(`Twilio Error Code: ${error.code}`);
+      }
+      if (error.moreInfo) {
+        console.error(`More Info: ${error.moreInfo}`);
+      }
     }
   }
 };
