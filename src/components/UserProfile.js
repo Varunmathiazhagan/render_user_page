@@ -676,11 +676,11 @@ const UserProfile = () => {
           
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <div className="flex items-start">
-              <FaInfoCircle className="text-yellow-500 mt-1 mr-2" />
+              <FaInfoCircle className="text-yellow-500 mt-1 mr-2 flex-shrink-0" />
               <div>
                 <p className="text-sm text-gray-700">
-                  <span className="font-medium">Achievement Badges</span> are awarded based on your purchasing behavior.
-                  Purchase more products to unlock higher-tier badges and showcase your shopping achievements!
+                  <span className="font-medium">Achievement Badges</span> are awarded based on your purchasing history.
+                  Purchase more products to unlock higher-tier badges!
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   Click on any badge to see detailed information and your progress towards unlocking it.
@@ -1107,21 +1107,6 @@ const UserProfile = () => {
           </span>
         )}
       </button>
-      <button
-        className={`py-2 px-4 font-medium text-sm ${
-          activeTab === 'badges' 
-            ? 'text-yellow-600 border-b-2 border-yellow-600' 
-            : 'text-gray-500 hover:text-gray-700'
-        }`}
-        onClick={() => setActiveTab('badges')}
-      >
-        <FaTrophy className="inline mr-2" /> Badges
-        {badges.filter(b => b.isUnlocked).length > 0 && (
-          <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full">
-            {badges.filter(b => b.isUnlocked).length}
-          </span>
-        )}
-      </button>
     </div>
   );
 
@@ -1357,6 +1342,23 @@ const UserProfile = () => {
     </div>
   );
 
+  // Calculate highest badge earned - based on total products purchased
+  const highestBadge = useMemo(() => {
+    if (!orders || orders.length === 0) return null;
+    
+    // Count total products purchased across all orders
+    const totalProductsPurchased = orders.reduce((total, order) => {
+      return total + order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    }, 0);
+
+    // Find the highest regular badge based on purchase threshold
+    const earnedBadges = badgeDefinitions
+      .filter(badge => !badge.isSpecial && totalProductsPurchased >= badge.unlockThreshold)
+      .sort((a, b) => b.unlockThreshold - a.unlockThreshold);
+    
+    return earnedBadges.length > 0 ? earnedBadges[0] : null;
+  }, [orders, badgeDefinitions]);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       {showPasswordModal && <PasswordChangeModal />}
@@ -1403,33 +1405,45 @@ const UserProfile = () => {
           </div>
           
           <div className="bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white p-8 flex flex-col md:flex-row items-center md:items-start gap-6">
-            <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-5xl backdrop-blur-sm border-2 border-white/30 relative group overflow-hidden">
-              {user.profileImage || profileImage ? (
-                <img
-                  src={profileImage || user.profileImage}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <FaUser />
-              )}
-              {editMode && (
-                <label htmlFor="profile-image" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                  <FaCamera className="text-2xl" />
-                  <input
-                    type="file"
-                    id="profile-image"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleImageChange}
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-5xl backdrop-blur-sm border-2 border-white/30 relative group overflow-hidden">
+                {user.profileImage || profileImage ? (
+                  <img
+                    src={profileImage || user.profileImage}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
                   />
-                </label>
+                ) : (
+                  <FaUser />
+                )}
+                {editMode && (
+                  <label htmlFor="profile-image" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    <FaCamera className="text-2xl" />
+                    <input
+                      type="file"
+                      id="profile-image"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                )}
+              </div>
+              
+              {/* Display highest badge near profile image */}
+              {highestBadge && (
+                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1.5 shadow-lg border-2 border-white" title={`${highestBadge.name} Badge`}>
+                  <div className={`${highestBadge.backgroundColor} ${highestBadge.borderColor} rounded-full p-1`}>
+                    {highestBadge.icon}
+                  </div>
+                </div>
               )}
             </div>
 
             {renderProfileInfo()}
           </div>
 
+          {/* Show error message if exists */}
           {error && typeof error === 'string' && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-6 mt-6">
               <div className="flex">
@@ -1660,6 +1674,7 @@ const UserProfile = () => {
                     Permanently delete your account and all associated data.
                   </p>
                   <button
+
                     onClick={() => setShowDeleteModal(true)}
                     className="flex items-center text-sm text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
                   >
