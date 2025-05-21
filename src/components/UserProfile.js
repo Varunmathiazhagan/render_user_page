@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   FaUser, FaEnvelope, FaCalendarAlt, FaShieldAlt, FaEdit,
   FaCamera, FaSave, FaTimes, FaPhone, FaMapMarkerAlt, FaBell,
   FaExclamationTriangle, FaSpinner, FaKey, FaTrash, FaDownload,
-  FaSignOutAlt, FaChartPie, FaCheck, FaLock, FaHistory,
+  FaSignOutAlt, FaCheck, FaLock, FaHistory,
   FaShoppingBag, FaBox, FaMoneyBillWave, FaEye, FaShoppingCart,
-  FaHeart, FaTrashAlt, FaPlus, FaCartPlus
+  FaHeart, FaTrashAlt, FaPlus, FaCartPlus, FaCrown, FaMedal,
+  FaTrophy, FaAward, FaGem, FaChartLine, FaInfoCircle
 } from "react-icons/fa";
 import axios from "axios";
 
@@ -37,7 +38,106 @@ const UserProfile = () => {
   const [wishlist, setWishlist] = useState([]);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [wishlistError, setWishlistError] = useState(null);
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'wishlist'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'wishlist' or 'badges'
+
+  // Badges state
+  const [badges, setBadges] = useState([]);
+  const [selectedBadge, setSelectedBadge] = useState(null);
+  const [showBadgeModal, setShowBadgeModal] = useState(false);
+
+  // Badge definitions wrapped in useMemo to prevent re-creation on every render
+  const badgeDefinitions = useMemo(() => [
+    {
+      id: 'newbie',
+      name: 'Newbie Shopper',
+      icon: <FaShoppingCart className="text-blue-400" />,
+      description: 'Welcome to your shopping journey! You made your first purchase.',
+      requirement: 'Make your first purchase',
+      backgroundColor: 'bg-blue-100',
+      borderColor: 'border-blue-400',
+      unlockThreshold: 1 // 1 product purchased
+    },
+    {
+      id: 'bronze',
+      name: 'Bronze Buyer',
+      icon: <FaMedal className="text-yellow-700" />,
+      description: 'You\'re getting started on your shopping journey with a few purchases.',
+      requirement: 'Purchase 5 products',
+      backgroundColor: 'bg-yellow-100',
+      borderColor: 'border-yellow-700',
+      unlockThreshold: 5 // 5 products purchased
+    },
+    {
+      id: 'silver',
+      name: 'Silver Supporter',
+      icon: <FaMedal className="text-gray-400" />,
+      description: 'Your shopping is gaining momentum! You\'re becoming a regular customer.',
+      requirement: 'Purchase 15 products',
+      backgroundColor: 'bg-gray-100',
+      borderColor: 'border-gray-400',
+      unlockThreshold: 15 // 15 products purchased
+    },
+    {
+      id: 'gold',
+      name: 'Gold Enthusiast',
+      icon: <FaMedal className="text-yellow-500" />,
+      description: 'You\'re a valuable customer with consistent purchasing habits!',
+      requirement: 'Purchase 30 products',
+      backgroundColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-500',
+      unlockThreshold: 30 // 30 products purchased
+    },
+    {
+      id: 'platinum',
+      name: 'Platinum Patron',
+      icon: <FaAward className="text-blue-600" />,
+      description: 'Your loyalty is remarkable! You\'ve made a significant number of purchases.',
+      requirement: 'Purchase 50 products',
+      backgroundColor: 'bg-blue-50',
+      borderColor: 'border-blue-600',
+      unlockThreshold: 50 // 50 products purchased
+    },
+    {
+      id: 'diamond',
+      name: 'Diamond Elite',
+      icon: <FaGem className="text-purple-500" />,
+      description: 'You\'re among our most elite customers with an exceptional purchase record!',
+      requirement: 'Purchase 75 products',
+      backgroundColor: 'bg-purple-50',
+      borderColor: 'border-purple-500',
+      unlockThreshold: 75 // 75 products purchased
+    },
+    {
+      id: 'vip',
+      name: 'VIP Shopper',
+      icon: <FaCrown className="text-yellow-600" />,
+      description: 'You\'ve reached the pinnacle of shopping status! You\'re a true VIP.',
+      requirement: 'Purchase 100 products',
+      backgroundColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-600',
+      unlockThreshold: 100 // 100 products purchased
+    },
+    {
+      id: 'loyal',
+      name: 'Loyal Customer',
+      icon: <FaHeart className="text-red-500" />,
+      description: 'You\'ve been with us for a long time! Your loyalty is appreciated.',
+      requirement: 'Maintain an active account for over a year',
+      backgroundColor: 'bg-red-50',
+      borderColor: 'border-red-500',
+      isSpecial: true // Special badge not tied to product count
+    },
+    {
+      id: 'trendsetter',
+      name: 'Trendsetter',
+      icon: <FaChartLine className="text-green-500" />,
+      description: 'You buy products soon after they\'re released! You\'re ahead of the curve.',
+      requirement: 'Purchase products within 48 hours of their release',
+      backgroundColor: 'bg-green-50',
+      borderColor: 'border-green-500',
+      isSpecial: true // Special badge not tied to product count
+    }
+  ], []); // Empty dependency array since these definitions don't depend on any state or props
 
   const API_URL = "https://render-user-page.onrender.com";
 
@@ -396,6 +496,202 @@ const UserProfile = () => {
     ];
     return Math.round((fields.filter(Boolean).length / fields.length) * 100);
   };
+
+  // Calculate badges based on purchase history - memoized with useCallback
+  const calculateBadges = useCallback(() => {
+    if (!orders || orders.length === 0) {
+      return [];
+    }
+
+    // Count total products purchased across all orders
+    const totalProductsPurchased = orders.reduce((total, order) => {
+      return total + order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    }, 0);
+
+    // Calculate how long the user has been a customer
+    const firstOrderDate = new Date(Math.min(...orders.map(order => new Date(order.createdAt).getTime())));
+    const daysSinceFirstOrder = Math.floor((new Date() - firstOrderDate) / (1000 * 60 * 60 * 24));
+    
+    // Determine which badges are unlocked
+    const unlockedBadges = badgeDefinitions.filter(badge => {
+      if (badge.isSpecial) {
+        // Handle special badges
+        if (badge.id === 'loyal') {
+          return daysSinceFirstOrder >= 365; // User for more than a year
+        }
+        if (badge.id === 'trendsetter') {
+          // This is just a placeholder logic - in a real app you'd check if they bought products within 48h of release
+          return orders.length >= 3 && totalProductsPurchased >= 10;
+        }
+        return false;
+      } else {
+        // Regular badges based on product count
+        return totalProductsPurchased >= badge.unlockThreshold;
+      }
+    });
+    
+    // Add progress to each badge
+    return badgeDefinitions.map(badge => {
+      const isUnlocked = unlockedBadges.some(b => b.id === badge.id);
+      let progress = 0;
+      
+      if (!badge.isSpecial && badge.unlockThreshold > 0) {
+        progress = Math.min(100, Math.round((totalProductsPurchased / badge.unlockThreshold) * 100));
+      } else if (badge.id === 'loyal') {
+        progress = Math.min(100, Math.round((daysSinceFirstOrder / 365) * 100));
+      } else if (badge.id === 'trendsetter') {
+        // Placeholder progress for trendsetter
+        progress = orders.length >= 3 ? 100 : Math.round((orders.length / 3) * 100);
+      }
+      
+      return {
+        ...badge,
+        isUnlocked,
+        progress
+      };
+    });
+  }, [orders, badgeDefinitions]);
+
+  // Update badges when orders are loaded
+  useEffect(() => {
+    if (!loadingOrders && orders.length > 0) {
+      const calculatedBadges = calculateBadges();
+      setBadges(calculatedBadges);
+    }
+  }, [orders, loadingOrders, calculateBadges]);
+
+  const handleBadgeClick = (badge) => {
+    setSelectedBadge(badge);
+    setShowBadgeModal(true);
+  };
+
+  // Badge detail modal
+  const BadgeDetailModal = () => {
+    if (!selectedBadge) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`bg-white rounded-lg shadow-xl w-full max-w-md p-6 ${selectedBadge.backgroundColor} border-l-4 ${selectedBadge.borderColor}`}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              {selectedBadge.icon}
+              {selectedBadge.name}
+            </h3>
+            <button onClick={() => setShowBadgeModal(false)} className="text-gray-500 hover:text-gray-700">
+              <FaTimes />
+            </button>
+          </div>
+          
+          <div className="mb-4">
+            <p className="text-gray-700 mb-2">{selectedBadge.description}</p>
+            <p className="text-sm text-gray-600 font-medium mt-2">Requirement:</p>
+            <p className="text-sm text-gray-600">{selectedBadge.requirement}</p>
+          </div>
+          
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 font-medium mb-1">Progress:</p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className={`h-2.5 rounded-full ${selectedBadge.isUnlocked ? 'bg-green-600' : 'bg-blue-600'}`}
+                style={{ width: `${selectedBadge.progress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-500">0%</span>
+              <span className="text-xs text-gray-500">{selectedBadge.progress}%</span>
+              <span className="text-xs text-gray-500">100%</span>
+            </div>
+          </div>
+          
+          <div className="mt-4 text-center">
+            {selectedBadge.isUnlocked ? (
+              <div className="bg-green-100 text-green-800 p-2 rounded-lg flex items-center justify-center">
+                <FaCheck className="mr-2" /> Badge Unlocked!
+              </div>
+            ) : (
+              <div className="bg-blue-100 text-blue-800 p-2 rounded-lg flex items-center justify-center">
+                <FaLock className="mr-2" /> Keep shopping to unlock this badge!
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBadges = () => (
+    <motion.div
+      whileHover={{ y: -5 }}
+      className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-8"
+    >
+      <h3 className="font-semibold text-lg flex items-center mb-4 text-gray-700">
+        <FaTrophy className="mr-2 text-yellow-500" /> Achievement Badges
+      </h3>
+      
+      {loadingOrders ? (
+        <div className="text-center py-8">
+          <FaSpinner className="text-yellow-500 text-2xl animate-spin mx-auto mb-2" />
+          <p className="text-gray-500">Loading your achievements...</p>
+        </div>
+      ) : badges.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 rounded-lg">
+          <FaTrophy className="text-gray-400 text-3xl mx-auto mb-4" />
+          <p className="text-gray-700 font-medium mb-2">No badges yet</p>
+          <p className="text-gray-500 mb-4 max-w-md mx-auto">
+            Start shopping to earn achievement badges and track your progress!
+          </p>
+          <button
+            onClick={() => window.location.href = "/products"}
+            className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition-colors flex items-center mx-auto"
+          >
+            <FaShoppingCart className="mr-2" /> Start Shopping
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
+            {badges.map((badge) => (
+              <div 
+                key={badge.id}
+                onClick={() => handleBadgeClick(badge)}
+                className={`${badge.backgroundColor} border ${badge.isUnlocked ? badge.borderColor : 'border-gray-200'} 
+                  rounded-lg p-3 flex flex-col items-center justify-center text-center cursor-pointer
+                  transition-all duration-200 hover:shadow-md ${badge.isUnlocked ? '' : 'opacity-60 filter grayscale'}`}
+              >
+                <div className={`w-12 h-12 rounded-full ${badge.isUnlocked ? badge.borderColor : 'bg-gray-100'} 
+                  flex items-center justify-center text-xl mb-2`}>
+                  {badge.isUnlocked ? badge.icon : <FaLock className="text-gray-400" />}
+                </div>
+                <p className="font-medium text-sm mb-1">{badge.name}</p>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
+                  <div 
+                    className={`h-1.5 rounded-full ${badge.isUnlocked ? 'bg-green-500' : 'bg-blue-500'}`}
+                    style={{ width: `${badge.progress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500">{badge.progress}% completed</p>
+              </div>
+            ))}
+          </div>
+          
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <div className="flex items-start">
+              <FaInfoCircle className="text-yellow-500 mt-1 mr-2" />
+              <div>
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">Achievement Badges</span> are awarded based on your purchasing behavior.
+                  Purchase more products to unlock higher-tier badges and showcase your shopping achievements!
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Click on any badge to see detailed information and your progress towards unlocking it.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
 
   const PasswordChangeModal = () => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -811,6 +1107,21 @@ const UserProfile = () => {
           </span>
         )}
       </button>
+      <button
+        className={`py-2 px-4 font-medium text-sm ${
+          activeTab === 'badges' 
+            ? 'text-yellow-600 border-b-2 border-yellow-600' 
+            : 'text-gray-500 hover:text-gray-700'
+        }`}
+        onClick={() => setActiveTab('badges')}
+      >
+        <FaTrophy className="inline mr-2" /> Badges
+        {badges.filter(b => b.isUnlocked).length > 0 && (
+          <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full">
+            {badges.filter(b => b.isUnlocked).length}
+          </span>
+        )}
+      </button>
     </div>
   );
 
@@ -881,8 +1192,6 @@ const UserProfile = () => {
       </div>
     );
   }
-
-  const profileCompleteness = calculateProfileCompleteness();
 
   const renderOrderHistory = () => (
     <motion.div
@@ -1054,6 +1363,7 @@ const UserProfile = () => {
       {showDeleteModal && <DeleteAccountModal />}
       {showOrderDetails && <OrderDetailsModal order={selectedOrder} onClose={() => setShowOrderDetails(false)} />}
       {showClearWishlistModal && <ClearWishlistModal />}
+      {showBadgeModal && <BadgeDetailModal />}
       
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -1079,19 +1389,19 @@ const UserProfile = () => {
           <div className="bg-white px-8 pt-6 pb-0">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-sm font-medium text-gray-500 flex items-center">
-                <FaChartPie className="mr-2 text-blue-500" />
+                <FaUser className="mr-2 text-blue-500" />
                 Profile Completeness
               </h3>
-              <span className="text-sm font-medium">{profileCompleteness}%</span>
+              <span className="text-sm font-medium">{calculateProfileCompleteness()}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5">
               <div
                 className="bg-blue-600 h-2.5 rounded-full"
-                style={{ width: `${profileCompleteness}%` }}
+                style={{ width: `${calculateProfileCompleteness()}%` }}
               ></div>
             </div>
           </div>
-
+          
           <div className="bg-gradient-to-r from-blue-600/90 to-purple-600/90 text-white p-8 flex flex-col md:flex-row items-center md:items-start gap-6">
             <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-5xl backdrop-blur-sm border-2 border-white/30 relative group overflow-hidden">
               {user.profileImage || profileImage ? (
@@ -1362,6 +1672,7 @@ const UserProfile = () => {
             <div className="mt-8">
               <h3 className="font-semibold text-lg text-gray-700 mb-4 flex items-center">
                 <FaHistory className="mr-2 text-blue-500" /> Recent Activity
+
               </h3>
               <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                 <div className="p-4 bg-gray-100 border-b border-gray-200">
@@ -1378,7 +1689,7 @@ const UserProfile = () => {
                         <p className="text-xs text-gray-500">Your profile information was updated</p>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500">
+                                       <span className="text-xs text-gray-500">
                       {user.lastUpdated ? new Date(user.lastUpdated).toLocaleDateString() : "Never"}
                     </span>
                   </div>
@@ -1402,7 +1713,9 @@ const UserProfile = () => {
 
             {renderTabButtons()}
               
-            {activeTab === 'orders' ? renderOrderHistory() : renderWishlist()}
+            {activeTab === 'orders' ? renderOrderHistory() : 
+             activeTab === 'wishlist' ? renderWishlist() : 
+             renderBadges()}
           </div>
         </div>
       </motion.div>
