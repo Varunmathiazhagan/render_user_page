@@ -9,10 +9,8 @@ import {
   FaInfoCircle,
   FaCheckCircle,
   FaTimesCircle,
-  FaTruck,
-  FaQrcode,
+  FaTruck
 } from "react-icons/fa";
-import { QRCodeSVG } from "qrcode.react"; // Import QRCodeSVG for UPI payment
 import axios from "axios";
 
 const Payment = ({ 
@@ -22,7 +20,7 @@ const Payment = ({
   user, 
   totalPrice, 
   handleBackClick, 
-  onSuccessfulPayment 
+  onSuccessfulPayment
 }) => {
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -30,66 +28,8 @@ const Payment = ({
     status: "initial",
     message: "",
   });
-  const [showUpiModal, setShowUpiModal] = useState(false); // State for UPI modal
-  const [upiPaymentConfirmed, setUpiPaymentConfirmed] = useState(false); // State for UPI payment confirmation
 
   const buttonTapVariants = { tap: { scale: 0.95 } };
-
-  const handleUPIPayment = () => {
-    setShowUpiModal(true);
-  };
-
-  const handleUPIPaymentCompletion = async () => {
-    setIsProcessingPayment(true);
-    setPaymentStatus({ status: "processing", message: "Processing your payment..." });
-
-    const userEmail = user?.email || shippingInfo.email;
-    const orderData = {
-      userId: user ? user._id || user.id : null,
-      userName: user ? user.name : shippingInfo.fullName,
-      userEmail,
-      orderItems: cart.map((item) => ({
-        productId: item.productId || item.id || null,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image,
-      })),
-      shippingInfo: {
-        ...shippingInfo,
-        email: userEmail,
-      },
-      deliveryMethod,
-      paymentMethod: "upi",
-      subtotal: totalPrice,
-      deliveryPrice: deliveryMethod === "express" ? 100 : 0,
-      totalPrice: totalPrice + (deliveryMethod === "express" ? 100 : 0),
-      orderReference: `ORD-${Math.floor(Math.random() * 1000000)}`,
-      notes: "",
-    };
-
-    try {
-      const response = await axios.post("https://render-user-page.onrender.com/api/orders", orderData, {
-        timeout: 10000,
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.data || !response.data.order) {
-        throw new Error("Invalid response from server");
-      }
-
-      setIsProcessingPayment(false);
-      setPaymentStatus({ status: "success", message: "Payment successful!" });
-      setTimeout(() => onSuccessfulPayment(response.data.order, "upi"), 1000);
-    } catch (error) {
-      console.error("Error saving order:", error);
-      setIsProcessingPayment(false);
-      setPaymentStatus({
-        status: "error",
-        message: "Payment succeeded but order processing failed. Please contact support.",
-      });
-    }
-  };
 
   // Razorpay check
   const checkRazorpayReady = () => {
@@ -290,64 +230,6 @@ const Payment = ({
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="bg-white p-6 md:p-8 rounded-lg shadow-lg mt-6 border border-gray-100"
     >
-      {/* UPI Payment Modal */}
-      <AnimatePresence>
-        {showUpiModal && (
-          <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">UPI Payment</h3>
-                <button
-                  className="text-gray-500 hover:text-gray-700"
-                  onClick={() => setShowUpiModal(false)}
-                >
-                  ×
-                </button>
-              </div>
-              <div className="flex flex-col items-center">
-                <QRCodeSVG
-                  value={`upi://pay?pa=varunesht26@okicici&pn=Royal%20Castle%20Farm%20Stay&am=${totalPrice}&cu=INR`}
-                  size={200}
-                  bgColor={"#ffffff"}
-                  fgColor={"#000000"}
-                  level={"L"}
-                  includeMargin={true}
-                />
-                <p className="mt-4 text-gray-700">
-                  <strong>UPI ID:</strong> varunesht26@okicici
-                </p>
-                <p className="text-gray-700">
-                  <strong>Amount:</strong> ₹{totalPrice}
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Scan this QR code with any UPI app to pay.
-                </p>
-                <button
-                  className={`mt-4 px-4 py-2 rounded-lg ${
-                    upiPaymentConfirmed ? "bg-green-500 text-white" : "bg-blue-500 text-white"
-                  }`}
-                  onClick={() => setUpiPaymentConfirmed(!upiPaymentConfirmed)}
-                >
-                  {upiPaymentConfirmed ? "✓ Payment Confirmed" : "I have made the payment"}
-                </button>
-                <button
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
-                  disabled={!upiPaymentConfirmed}
-                  onClick={handleUPIPaymentCompletion}
-                >
-                  Complete Payment
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Payment Processing Overlay */}
       <AnimatePresence>
         {isProcessingPayment && (
@@ -530,34 +412,6 @@ const Payment = ({
               <FaCheckCircle className="text-blue-500 text-xl" />
             )}
           </motion.div>
-
-          <motion.div
-            className={`border rounded-lg p-5 flex items-start space-x-3 cursor-pointer transition-all duration-300 ${
-              paymentMethod === "upi"
-                ? "bg-blue-50 border-blue-300 shadow-sm"
-                : "border-gray-200 hover:bg-gray-50"
-            }`}
-            whileHover={{ scale: 1.01 }}
-            onClick={() => setPaymentMethod("upi")}
-          >
-            <input
-              type="radio"
-              name="paymentMethod"
-              checked={paymentMethod === "upi"}
-              onChange={() => setPaymentMethod("upi")}
-              className="form-radio h-5 w-5 text-blue-600 mt-1"
-            />
-            <div className="flex-1">
-              <div className="flex items-center mb-1">
-                <FaQrcode className="text-purple-500 text-xl mr-2" />
-                <p className="font-medium text-lg">UPI Payment</p>
-              </div>
-              <p className="text-sm text-gray-600">Pay using UPI apps like Google Pay, PhonePe, etc.</p>
-            </div>
-            {paymentMethod === "upi" && (
-              <FaCheckCircle className="text-blue-500 text-xl" />
-            )}
-          </motion.div>
         </div>
       </div>
       
@@ -598,19 +452,6 @@ const Payment = ({
             </>
           )}
         </motion.button>
-
-        {paymentMethod === "upi" && (
-          <motion.button
-            variants={buttonTapVariants}
-            whileHover={{ scale: 1.03 }}
-            whileTap="tap"
-            onClick={handleUPIPayment}
-            className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-3 rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center space-x-3 sm:w-auto w-full"
-          >
-            <FaQrcode />
-            <span>Pay via UPI</span>
-          </motion.button>
-        )}
       </div>
     </motion.div>
   );
