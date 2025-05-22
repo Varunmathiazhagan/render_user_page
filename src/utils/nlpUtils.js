@@ -183,7 +183,8 @@ export const detectIntent = (text) => {
       /^bye\b|^goodbye\b|^see you\b|^farewell\b|^have a good day\b/i
     ],
     information: [
-      /what|how|which|where|when|why|who|tell me about|can you explain|i need to know|i want to know/i
+      /what|how|which|where|when|why|who|tell me about|can you explain|i need to know|i want to know/i,
+      /about your company|about ksp yarns|company details|company information/i // Added pattern
     ],
     purchase: [
       /buy|purchase|order|shop|get|acquire|cost|price|how much|how many/i

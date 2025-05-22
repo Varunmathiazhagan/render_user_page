@@ -200,7 +200,7 @@ export const knowledgeBase = {
     page: 'sustainability'
   },
   'company': {
-    keywords: ['company', 'about', 'history', 'background', 'founded', 'who are you', 'ksp', 'mission', 'vision', 'values', 'team', 'establishment'],
+    keywords: ['company', 'about', 'history', 'background', 'founded', 'who are you', 'ksp', 'mission', 'vision', 'values', 'team', 'establishment', 'tell me about your company'], // Added keyword
     response: t("KSP Yarns was established in 2005 with a mission to provide premium quality yarns while embracing sustainable practices. We've grown from a small local supplier to an international yarn manufacturer known for quality, innovation, and environmental responsibility. Our team includes experienced textile engineers and quality control experts committed to excellence.", "chatbot"),
     followUpQuestions: [
       t("Who founded KSP Yarns?", "chatbot"),
