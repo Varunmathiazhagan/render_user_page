@@ -2,10 +2,9 @@ import React, { useRef, useState } from "react";
 import { motion, useScroll, useSpring, AnimatePresence } from "framer-motion";
 import { FaHistory, FaLeaf, FaUsers, FaTrophy, FaLandmark, FaMapMarkerAlt, FaSeedling, FaWater, FaRecycle } from "react-icons/fa"; 
 import { useInView } from "react-intersection-observer";
-// Import translation hook
 import { useTranslation } from "../utils/TranslationContext";
 
-// Enhanced responsive StatCard with better animations
+
 const StatCard = ({ number, label, prefix = "", suffix = "", icon }) => {
   const { t } = useTranslation();
   const { ref, inView } = useInView({ threshold: 0.3, triggerOnce: true });

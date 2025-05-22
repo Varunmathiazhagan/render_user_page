@@ -359,7 +359,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
       className="bg-white p-6 rounded-lg shadow-md"
     >
       <h2 className="text-2xl font-bold mb-6 flex items-center space-x-2">
-        <FaTruck className="text-blue-600" /> <span>Shipping Information</span>
+        <FaTruck className="text-blue-600" /> <span>Shipping Address</span>
       </h2>
       
       {/* Always show user's email since it's required */}
