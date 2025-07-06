@@ -28,7 +28,14 @@ const JWT_EXPIRATION = "1d"; // 1 day
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: ['https://ksp-gamma.vercel.app', 'https://kspyarnsadmin.vercel.app', 'http://localhost:5173', '*'],
+  origin: [
+    'https://ksp-gamma.vercel.app',
+    'https://kspyarnsadmin.vercel.app',
+    'http://localhost:5173',
+    'https://ksp.varunm.tech',
+    'https://kspadmin.varunm.tech', // Added new allowed origin
+    '*'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -693,7 +700,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'mvarunmathi2004@gmail.com', // Your Gmail address
-    pass: 'ahiw jlsz dzxa ohso' // Your Gmail app password
+    pass: 'ahiw jlsz dzxaohso' // Your Gmail app password
   }
 });
 
