@@ -4,7 +4,8 @@ import { FaRobot, FaComments, FaTimes, FaPaperPlane, FaSpinner, FaLightbulb, FaM
          FaThumbsUp, FaThumbsDown, FaRegSmile, FaRegCopy, FaVolumeUp } from 'react-icons/fa';
 import { useTranslation } from '../utils/TranslationContext';
 import { knowledgeBase, extendedKnowledgeBase } from '../data/chatbotKnowledgeBase';
-import { preprocessText, calculateSimilarity, detectIntent, extractEntities, generateContextualResponse } from '../utils/nlpUtils';
+import { preprocessText, calculateSimilarity, detectIntent, extractEntities, 
+         generateContextualResponse, calculateRelevanceScore } from '../utils/nlpUtils';
 
 const ChatBot = () => {
   const { t } = useTranslation();
@@ -153,52 +154,28 @@ const ChatBot = () => {
     }
   }, [messages]);
 
-  // Reset greeting flag for testing or if needed
+  // Show greeting only on first visit
   useEffect(() => {
-    // Clear greeting flag if needed
-    // localStorage.removeItem('kspGreetingShown');
-  }, []);
-
-  // Force reset greeting state for development
-  useEffect(() => {
-    // Reset greeting flags to ensure it shows
-    localStorage.removeItem('kspGreetingShown');
-    localStorage.removeItem('kspChatOpenCount');
+    const greetingShown = localStorage.getItem('kspGreetingShown');
     
-    // Log for debugging
-    console.log('Greeting state reset, greeting should appear shortly');
-  }, []);
-
-  // Simplified greeting logic - always show at startup
-  useEffect(() => {
-    // Show greeting with slight delay after page loads
-    const timer = setTimeout(() => {
-      console.log('Showing greeting animation');
-      setShowGreeting(true);
+    if (!greetingShown) {
+      // Show greeting with slight delay after page loads
+      const timer = setTimeout(() => {
+        setShowGreeting(true);
+        
+        // Hide after 8 seconds
+        setTimeout(() => {
+          setShowGreeting(false);
+          localStorage.setItem('kspGreetingShown', 'true');
+        }, 8000);
+      }, 1000);
       
-      // Hide after 8 seconds (increased from 5 for better visibility)
-      setTimeout(() => {
-        console.log('Hiding greeting animation');
-        setShowGreeting(false);
-        localStorage.setItem('kspGreetingShown', 'true');
-      }, 8000);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }
   }, []); // Empty dependency array means this runs once on mount
 
   const toggleChat = useCallback(() => {
-    const newIsOpen = !isOpen;
-    setIsOpen(newIsOpen);
-    
-    // Always show greeting when chat is opened
-    if (newIsOpen) {
-      console.log('Chat opened, showing greeting');
-      setShowGreeting(true);
-      setTimeout(() => {
-        setShowGreeting(false);
-      }, 5008);
-    }
+    setIsOpen(!isOpen);
   }, [isOpen]);
 
   const handleInputChange = useCallback((e) => {
@@ -266,13 +243,12 @@ const ChatBot = () => {
     // Extract user intent and entities for better understanding
     const userIntent = detectIntent(userMessage);
     const entities = extractEntities(userMessage);
-    console.log('User intent:', userIntent, 'Entities:', entities);
 
     // Pre-process the user message for NLP matching
     // eslint-disable-next-line no-unused-vars
     const processedUserMessage = preprocessText(userMessage).join(' ');
     
-    // Handle basic intents first
+    // Handle basic intents first with higher priority
     if (userIntent === 'greeting') {
       updateConversationContext('greeting');
       
@@ -298,20 +274,74 @@ const ChatBot = () => {
       return knowledgeBase.thanks.response;
     }
     
-    // Calculate similarity scores with all topics in the knowledge base
-    const similarityScores = extendedKnowledgeBase.map(entry => ({
-      topic: entry.topic,
-      similarity: calculateSimilarity(userMessage, entry.originalText)
-    }));
+    // Enhanced matching with multiple scoring methods
+    const scoringResults = extendedKnowledgeBase.map(entry => {
+      // Method 1: Semantic similarity
+      const semanticScore = calculateSimilarity(userMessage, entry.originalText);
+      
+      // Method 2: Relevance score (includes keyword matching)
+      const relevanceScore = calculateRelevanceScore(
+        userMessage, 
+        entry.originalText, 
+        entry.keywords || []
+      );
+      
+      // Method 3: Entity matching bonus
+      let entityBonus = 0;
+      if (entities.yarnTypes.length > 0) {
+        const hasYarnType = entry.keywords?.some(kw => 
+          entities.yarnTypes.some(yt => kw.toLowerCase().includes(yt.toLowerCase()))
+        );
+        if (hasYarnType) entityBonus = 0.2;
+      }
+      
+      if (entities.certifications.length > 0) {
+        const hasCertification = entry.keywords?.some(kw => 
+          entities.certifications.some(cert => kw.toLowerCase().includes(cert.toLowerCase()))
+        );
+        if (hasCertification) entityBonus += 0.15;
+      }
+      
+      // Method 4: Intent-based bonus
+      let intentBonus = 0;
+      if (userIntent === 'purchase' && entry.topic.includes('order')) {
+        intentBonus = 0.15;
+      } else if (userIntent === 'information' && entry.topic.includes('company')) {
+        intentBonus = 0.1;
+      } else if (userIntent === 'specification' && entry.topic.includes('specification')) {
+        intentBonus = 0.2;
+      } else if (userIntent === 'comparison' && entry.topic.includes('yarn')) {
+        intentBonus = 0.1;
+      }
+      
+      // Combined weighted score
+      const finalScore = (semanticScore * 0.4) + (relevanceScore * 0.35) + 
+                        entityBonus + intentBonus;
+      
+      return {
+        topic: entry.topic,
+        score: finalScore,
+        semanticScore,
+        relevanceScore,
+        entityBonus,
+        intentBonus
+      };
+    });
     
-    // Sort by similarity (highest first)
-    similarityScores.sort((a, b) => b.similarity - a.similarity);
+    // Sort by final score (highest first)
+    scoringResults.sort((a, b) => b.score - a.score);
     
-    console.log('Top matches:', similarityScores.slice(0, 3));
+    // Use adaptive threshold based on top scores
+    const topScore = scoringResults[0].score;
+    const secondScore = scoringResults[1]?.score || 0;
+    const scoreGap = topScore - secondScore;
     
-    // Use the best match if it's over the threshold
-    if (similarityScores[0].similarity > 0.15) {
-      const bestTopic = similarityScores[0].topic;
+    // If there's a clear winner (good score gap), use lower threshold
+    const adaptiveThreshold = scoreGap > 0.15 ? 0.2 : 0.3;
+    
+    // Use the best match if it meets the threshold
+    if (topScore > adaptiveThreshold) {
+      const bestTopic = scoringResults[0].topic;
       updateConversationContext(bestTopic);
       
       // Find the matched topic in the knowledge base
@@ -328,7 +358,7 @@ const ChatBot = () => {
         return matchedEntry.response(conversationContext);
       }
       
-      // Generate personalized response using the context
+      // Generate personalized response using the enhanced context
       const contextualResponse = generateContextualResponse(
         userMessage, 
         matchedEntry.response, 
@@ -353,7 +383,35 @@ const ChatBot = () => {
       return t("Welcome to KSP Yarns! We're a leading manufacturer of high-quality yarns with a focus on sustainability. How can I help you today?", "chatbot");
     }
     
-    // Default fallback response
+    // Enhanced fallback with suggestions based on detected intent
+    let fallbackSuggestions = [];
+    if (userIntent === 'purchase') {
+      fallbackSuggestions = [
+        t("How do I place an order?", "chatbot"),
+        t("What are your prices?", "chatbot"),
+        t("What products do you offer?", "chatbot")
+      ];
+    } else if (userIntent === 'information') {
+      fallbackSuggestions = [
+        t("Tell me about your company", "chatbot"),
+        t("What products do you offer?", "chatbot"),
+        t("What certifications do you have?", "chatbot")
+      ];
+    } else {
+      fallbackSuggestions = [
+        t("What products do you offer?", "chatbot"),
+        t("How do I place an order?", "chatbot"),
+        t("Tell me about your sustainability practices", "chatbot")
+      ];
+    }
+    
+    setSuggestedQuestions(fallbackSuggestions);
+    
+    // Default fallback response with intent-aware messaging
+    if (entities.yarnTypes.length > 0) {
+      return t(`I understand you're asking about ${entities.yarnTypes.join(', ')} yarns. Could you please be more specific? I can help with product details, pricing, ordering, or specifications.`, "chatbot");
+    }
+    
     return t("I'm not sure I understand. Could you please rephrase your question? I can help with information about our products, sustainability practices, ordering process, or company information.", "chatbot");
   }, [conversationContext, extractUserName, isNewVisitorGreeting, t, updateConversationContext]);
 
@@ -764,22 +822,6 @@ const ChatBot = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Debug button - always visible for easier testing */}
-      <div className="fixed top-4 right-4 z-50">
-        <button
-          onClick={() => {
-            localStorage.removeItem('kspGreetingShown');
-            localStorage.removeItem('kspChatOpenCount');
-            console.log('Manually showing greeting');
-            setShowGreeting(true);
-            setTimeout(() => setShowGreeting(false), 8000);
-          }}
-          className="bg-blue-500 text-white text-xs p-2 rounded shadow-md hover:bg-blue-600"
-        >
-          Show Greeting
-        </button>
-      </div>
 
       <AnimatePresence>
         {isOpen && (

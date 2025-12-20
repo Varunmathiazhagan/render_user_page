@@ -79,7 +79,7 @@ const cosineSimilarity = (docA, docB) => {
   const termsB = [...new Set(docB)];
   const allTerms = [...new Set([...termsA, ...termsB])];
   
-  // Create term frequency vectors
+  // Create term frequency vectors with TF-IDF weighting
   const vectorA = allTerms.map(term => calculateTF(term, docA));
   const vectorB = allTerms.map(term => calculateTF(term, docB));
   
@@ -100,6 +100,15 @@ const cosineSimilarity = (docA, docB) => {
   return dotProduct / (magnitudeA * magnitudeB);
 };
 
+// Calculate Jaccard similarity for additional matching
+const jaccardSimilarity = (setA, setB) => {
+  const intersection = setA.filter(item => setB.includes(item));
+  const union = [...new Set([...setA, ...setB])];
+  
+  if (union.length === 0) return 0;
+  return intersection.length / union.length;
+};
+
 // Calculate semantic similarity between two texts
 export const calculateSimilarity = (textA, textB) => {
   // Preprocess both texts
@@ -108,8 +117,12 @@ export const calculateSimilarity = (textA, textB) => {
   
   if (tokensA.length === 0 || tokensB.length === 0) return 0;
   
-  // Calculate cosine similarity
-  return cosineSimilarity(tokensA, tokensB);
+  // Calculate both cosine and Jaccard similarities
+  const cosineSim = cosineSimilarity(tokensA, tokensB);
+  const jaccardSim = jaccardSimilarity(tokensA, tokensB);
+  
+  // Weighted combination (cosine is more important for semantic similarity)
+  return (cosineSim * 0.7) + (jaccardSim * 0.3);
 };
 
 // Find the best match in a set of documents for a query
@@ -135,15 +148,24 @@ export const findBestMatch = (query, documents, threshold = 0.2) => {
 export const extractEntities = (text) => {
   const entities = {
     products: [],
+    yarnTypes: [],
+    counts: [],
     numbers: [],
     dates: [],
-    locations: []
+    locations: [],
+    colors: [],
+    certifications: []
   };
   
   if (!text) return entities;
   
+  // Extract yarn counts (Ne patterns)
+  const countPattern = /\b(ne|count)\s*(\d+)\s*(to|-)?\s*(\d+)?\b/gi;
+  const countMatches = text.match(countPattern) || [];
+  entities.counts = countMatches.map(match => match.trim());
+  
   // Extract numbers (including those with units)
-  const numberPattern = /\b\d+(\.\d+)?\s*(kg|g|mm|cm|m|inch|inches|yards|counts|ne)?\b/gi;
+  const numberPattern = /\b\d+(\.\d+)?\s*(kg|g|ton|tons|mm|cm|m|inch|inches|yards|counts?)?\b/gi;
   const numberMatches = text.match(numberPattern) || [];
   entities.numbers = numberMatches.map(match => match.trim());
   
@@ -151,100 +173,240 @@ export const extractEntities = (text) => {
   const datePattern = /\b(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{2,4})?)\b/gi;
   entities.dates = text.match(datePattern) || [];
   
-  // Extract common yarn types/products
-  const yarnTypes = ['cotton', 'polyester', 'blend', 'recycled', 'organic', 'vortex', 'ring spun', 'open end', 'oe yarn'];
+  // Extract yarn types with more specificity
+  const yarnTypes = [
+    'cotton', 'polyester', 'blended', 'blend', 'recycled', 'organic', 
+    'vortex', 'ring spun', 'ring-spun', 'open end', 'open-end', 'oe yarn',
+    'combed cotton', 'carded cotton', 'melange', 'mélange', 'slub',
+    'fancy yarn', 'core-spun', 'textured', 'virgin polyester',
+    'poly-cotton', 'cotton-viscose', 'viscose'
+  ];
   yarnTypes.forEach(type => {
     if (text.toLowerCase().includes(type)) {
-      entities.products.push(type);
+      entities.yarnTypes.push(type);
+    }
+  });
+  
+  // Extract product categories
+  const products = ['yarn', 'yarns', 'thread', 'fiber', 'fibre', 'textile'];
+  products.forEach(product => {
+    if (text.toLowerCase().includes(product)) {
+      entities.products.push(product);
     }
   });
   
   // Extract locations
-  const locations = ['india', 'karur', 'tamil nadu', 'sukkaliyur'];
+  const locations = ['india', 'karur', 'tamil nadu', 'sukkaliyur', 'gandhi nagar'];
   locations.forEach(location => {
     if (text.toLowerCase().includes(location)) {
       entities.locations.push(location);
     }
   });
   
+  // Extract colors
+  const colors = [
+    'white', 'black', 'red', 'blue', 'green', 'yellow', 'pink', 'grey', 'gray',
+    'brown', 'orange', 'purple', 'maroon', 'navy', 'lavender', 'rose'
+  ];
+  colors.forEach(color => {
+    if (text.toLowerCase().includes(color)) {
+      entities.colors.push(color);
+    }
+  });
+  
+  // Extract certifications
+  const certifications = ['gots', 'grs', 'oeko-tex', 'iso', 'iso 9001', 'iso 14001'];
+  certifications.forEach(cert => {
+    if (text.toLowerCase().includes(cert)) {
+      entities.certifications.push(cert);
+    }
+  });
+  
   return entities;
 };
 
-// Function to detect intent from user input
+// Function to detect intent from user input with confidence scoring
 export const detectIntent = (text) => {
   const lowerText = text.toLowerCase();
   
-  // Common intent patterns
+  // Enhanced intent patterns with priority scoring
   const intentPatterns = {
-    greeting: [
-      /^hi\b|^hello\b|^hey\b|^greetings\b|^good morning\b|^good afternoon\b|^good evening\b/i,
-    ],
-    farewell: [
-      /^bye\b|^goodbye\b|^see you\b|^farewell\b|^have a good day\b/i
-    ],
-    information: [
-      /what|how|which|where|when|why|who|tell me about|can you explain|i need to know|i want to know/i,
-      /about your company|about ksp yarns|company details|company information/i // Added pattern
-    ],
-    purchase: [
-      /buy|purchase|order|shop|get|acquire|cost|price|how much|how many/i
-    ],
-    complaint: [
-      /complaint|issue|problem|not happy|dissatisfied|poor|bad|terrible|awful|damaged|wrong/i
-    ],
-    gratitude: [
-      /thanks|thank you|appreciate|grateful|helpful/i
-    ],
-    cancellation: [
-      /cancel|refund|return|stop|don't want|changed my mind/i
-    ],
-    confirmation: [
-      /confirm|verify|check|sure|right|correct|ok|yes|yep|yeah/i
-    ],
-    negation: [
-      /no|nope|not|don't|none|never|negative/i
-    ]
+    greeting: {
+      patterns: [
+        /^(hi|hello|hey|greetings|good morning|good afternoon|good evening|howdy|sup)\b/i,
+      ],
+      priority: 10
+    },
+    farewell: {
+      patterns: [
+        /^(bye|goodbye|see you|farewell|have a good day|talk to you later|catch you later)\b/i
+      ],
+      priority: 10
+    },
+    information: {
+      patterns: [
+        /^(what|how|which|where|when|why|who)\b/i,
+        /tell me (about|more)|can you explain|i need to know|i want to know|i'm looking for|looking for/i,
+        /about your company|about ksp|company details|company information/i,
+        /do you (have|offer|provide|sell|make)/i
+      ],
+      priority: 8
+    },
+    purchase: {
+      patterns: [
+        /\b(buy|purchase|order|ordering|checkout|cart|payment|pay for)\b/i,
+        /\b(price|pricing|cost|costs|how much|rate|rates|quote)\b/i,
+        /i want to (buy|purchase|order|get)/i,
+        /place an order|make an order/i
+      ],
+      priority: 9
+    },
+    complaint: {
+      patterns: [
+        /complaint|complain|issue|problem|trouble|difficulty/i,
+        /not (happy|satisfied|working|good)|dissatisfied|disappointed/i,
+        /poor|bad|terrible|awful|horrible|worst/i,
+        /damaged|defective|broken|wrong|incorrect|missing/i
+      ],
+      priority: 9
+    },
+    gratitude: {
+      patterns: [
+        /\b(thanks|thank you|thx|ty|appreciate|grateful|helpful)\b/i
+      ],
+      priority: 10
+    },
+    cancellation: {
+      patterns: [
+        /\b(cancel|cancellation|refund|return|stop)\b/i,
+        /(don't|do not) want|changed my mind|no longer (need|want)/i
+      ],
+      priority: 9
+    },
+    confirmation: {
+      patterns: [
+        /^(confirm|verify|check|validate|yes|yep|yeah|sure|right|correct|ok|okay)\b/i
+      ],
+      priority: 7
+    },
+    negation: {
+      patterns: [
+        /^(no|nope|nah|not really|don't think so|negative)\b/i
+      ],
+      priority: 7
+    },
+    comparison: {
+      patterns: [
+        /\b(difference|compare|comparison|versus|vs|better|best|prefer)\b/i,
+        /which (one|is|are) (better|best|recommended)/i
+      ],
+      priority: 8
+    },
+    specification: {
+      patterns: [
+        /\b(specification|specs|details|technical|parameters|properties)\b/i,
+        /\b(count|counts|thickness|strength|quality|grade)\b/i
+      ],
+      priority: 8
+    }
   };
   
-  // Check for each intent
-  for (const [intent, patterns] of Object.entries(intentPatterns)) {
-    for (const pattern of patterns) {
+  // Score each intent
+  let bestIntent = { name: 'general', score: 0 };
+  
+  for (const [intent, config] of Object.entries(intentPatterns)) {
+    let score = 0;
+    for (const pattern of config.patterns) {
       if (pattern.test(lowerText)) {
-        return intent;
+        score = config.priority;
+        break;
       }
+    }
+    
+    if (score > bestIntent.score) {
+      bestIntent = { name: intent, score: score };
     }
   }
   
-  return 'general';
+  return bestIntent.name;
 };
 
 // Generate contextual responses based on conversation history
 export const generateContextualResponse = (query, matchedResponse, conversationContext) => {
-  // Removed unused intent variable
   const entities = extractEntities(query);
   
   // If we have a specific response, customize it based on context
   if (matchedResponse) {
-    // Add product specificity if detected
-    if (entities.products.length > 0 && matchedResponse.includes('products')) {
-      return matchedResponse.replace(
-        'our products', 
-        `our ${entities.products.join(', ')} products`
-      );
-    }
+    let customizedResponse = matchedResponse;
     
-    // Add personalization if we know the user name
-    if (conversationContext.userName && Math.random() > 0.7) {
-      if (matchedResponse.includes('.')) {
-        return matchedResponse.replace(
-          '. ', 
-          `. ${conversationContext.userName}, `
+    // Add yarn type specificity if detected
+    if (entities.yarnTypes.length > 0) {
+      if (customizedResponse.includes('yarns') || customizedResponse.includes('products')) {
+        const yarnTypeStr = entities.yarnTypes.join(' and ');
+        customizedResponse = customizedResponse.replace(
+          /\b(our yarns|our products|yarns)\b/i,
+          `our ${yarnTypeStr} $1`
         );
       }
     }
     
-    return matchedResponse;
+    // Add count specificity if detected
+    if (entities.counts.length > 0) {
+      const countStr = entities.counts.join(', ');
+      if (!customizedResponse.includes(countStr)) {
+        customizedResponse += ` We offer these in various counts including ${countStr}.`;
+      }
+    }
+    
+    // Add certification context if mentioned
+    if (entities.certifications.length > 0) {
+      const certStr = entities.certifications.join(', ').toUpperCase();
+      if (!customizedResponse.toLowerCase().includes(certStr.toLowerCase())) {
+        customizedResponse += ` Our products carry ${certStr} certifications.`;
+      }
+    }
+    
+    // Add personalization if we know the user name
+    if (conversationContext.userName && Math.random() > 0.7) {
+      if (customizedResponse.includes('.')) {
+        customizedResponse = customizedResponse.replace(
+          /\.\s/,
+          `, ${conversationContext.userName}. `
+        );
+      }
+    }
+    
+    // Add follow-up suggestion based on context
+    if (conversationContext.lastTopic && conversationContext.messageCount > 3) {
+      if (customizedResponse.includes('?')) {
+        // Already has a question, don't add more
+      } else if (Math.random() > 0.6) {
+        customizedResponse += " Would you like to know more about this?";
+      }
+    }
+    
+    return customizedResponse;
   }
   
   return null;
+};
+
+// Calculate relevance score for better matching
+export const calculateRelevanceScore = (query, topic, keywords) => {
+  const queryTokens = preprocessText(query);
+  const keywordTokens = keywords.flatMap(kw => preprocessText(kw));
+  
+  // Direct keyword match bonus
+  let keywordMatchScore = 0;
+  queryTokens.forEach(token => {
+    if (keywordTokens.includes(token)) {
+      keywordMatchScore += 0.15;
+    }
+  });
+  
+  // Topic similarity
+  const topicSimilarity = calculateSimilarity(query, topic);
+  
+  // Combined score
+  return Math.min(1.0, topicSimilarity + keywordMatchScore);
 };

@@ -133,13 +133,13 @@ export const pageContent = {
 // Enhanced knowledge base with data from all pages
 export const knowledgeBase = {
   'product': {
-    keywords: ['yarn', 'product', 'collection', 'buy', 'purchase', 'material', 'catalog', 'type', 'variety', 'stock', 'available', 'offer'],
-    text: "We offer a variety of high-quality yarns including recycled, OE, ring spun, and vortex yarns. Our product categories include cotton yarns (Ne 4 to Ne 80), polyester yarns (Ne 10 to Ne 60), blended yarns (Ne 6 to Ne 50), and specialty yarns. Cotton variants include organic, recycled, combed, and carded. Polyester options include virgin, recycled, and textured. Our production technologies include Ring Spinning, Open-End Spinning, and Vortex Spinning.",
-    response: t("We offer a variety of high-quality yarns including recycled, OE, ring spun, and vortex yarns. You can browse our full collection on the Products page. Our specialties include cotton, polyester, and blended yarns in various counts and qualities.", "chatbot"),
+    keywords: ['yarn', 'product', 'collection', 'buy', 'purchase', 'material', 'catalog', 'type', 'variety', 'stock', 'available', 'offer', 'sell', 'provide', 'manufacture'],
+    text: "We offer a comprehensive range of high-quality yarns including recycled, OE (Open-End), ring spun, and vortex yarns. Our product categories include: 1) Cotton yarns from Ne 4 to Ne 80 with variants like organic cotton, recycled cotton, combed cotton, and carded cotton. 2) Polyester yarns from Ne 10 to Ne 60 including virgin polyester, recycled polyester (GRS certified), and textured polyester. 3) Blended yarns from Ne 6 to Ne 50 such as poly-cotton blends (65/35, 50/50, 60/40 ratios), cotton-viscose blends, and specialty blends. 4) Specialty yarns including mélange yarns, slub yarns, fancy yarns, and core-spun yarns. Our production technologies include Ring Spinning for premium quality, Open-End Spinning for cost-effectiveness, and Vortex Spinning for low hairiness and superior performance.",
+    response: t("We offer a comprehensive range of high-quality yarns including:\n\n• Cotton Yarns (Ne 4-80): Organic, recycled, combed, and carded variants\n• Polyester Yarns (Ne 10-60): Virgin, recycled (GRS certified), and textured\n• Blended Yarns (Ne 6-50): Poly-cotton, cotton-viscose, and specialty blends\n• Specialty Yarns: Mélange, slub, fancy, and core-spun varieties\n\nWe use advanced spinning technologies including Ring Spinning, Open-End Spinning, and Vortex Spinning to ensure superior quality. All our products are certified and meet international standards.", "chatbot"),
     followUpQuestions: [
       t("What are your bestselling yarns?", "chatbot"),
-      t("Do you offer organic yarns?", "chatbot"),
-      t("What yarn counts do you offer?", "chatbot")
+      t("Tell me about your cotton yarns", "chatbot"),
+      t("What certifications do your products have?", "chatbot")
     ],
     page: 'products'
   },
@@ -190,12 +190,13 @@ export const knowledgeBase = {
     ]
   },
   'sustainability': {
-    keywords: ['eco', 'sustainable', 'environment', 'green', 'recycled', 'planet', 'organic', 'carbon', 'footprint', 'responsible', 'ethical', 'conservation'],
-    response: t("Sustainability is at the core of our values. We use eco-friendly manufacturing processes and offer a range of recycled and organic yarn options. Our factory employs water conservation methods, solar power, and waste reduction practices. We're certified by global sustainability standards and continuously work to improve our environmental impact.", "chatbot"),
+    keywords: ['eco', 'sustainable', 'environment', 'green', 'recycled', 'planet', 'organic', 'carbon', 'footprint', 'responsible', 'ethical', 'conservation', 'eco-friendly', 'renewable'],
+    text: "Sustainability is central to KSP Yarns' operations. Our comprehensive environmental initiatives include: 1) Solar-powered manufacturing facilities reducing carbon emissions, 2) Advanced water recycling and conservation systems achieving 60% water reuse, 3) Zero-waste manufacturing with complete waste recycling and reuse, 4) Sourcing organic and recycled raw materials from certified suppliers, 5) Energy-efficient machinery reducing power consumption by 40%. We hold prestigious certifications: GOTS (Global Organic Textile Standard) for organic products, GRS (Global Recycled Standard) for recycled content verification, ISO 14001 for Environmental Management, and OEKO-TEX Standard 100 for harmful substance testing. Our ambitious sustainability goals include achieving carbon neutrality by 2030, 100% renewable energy usage, zero landfill waste by 2025, and 50% reduction in water consumption by 2028.",
+    response: t("Sustainability is at the core of KSP Yarns' operations:\n\n🌱 Environmental Initiatives:\n• Solar-powered manufacturing facilities\n• 60% water recycling and conservation\n• Zero-waste manufacturing processes\n• Organic and recycled raw materials\n• 40% reduction in energy consumption\n\n🏆 Certifications:\n• GOTS (Global Organic Textile Standard)\n• GRS (Global Recycled Standard)\n• ISO 14001 (Environmental Management)\n• OEKO-TEX Standard 100\n\n🎯 Future Goals:\n• Carbon neutrality by 2030\n• 100% renewable energy usage\n• Zero landfill waste by 2025\n• 50% water consumption reduction by 2028\n\nWe're committed to sustainable textile manufacturing without compromising quality.", "chatbot"),
     followUpQuestions: [
-      t("What sustainability certifications do you have?", "chatbot"),
-      t("How do you recycle yarns?", "chatbot"),
-      t("What's your carbon footprint reduction strategy?", "chatbot")
+      t("Tell me about your recycled yarns", "chatbot"),
+      t("What is GOTS certification?", "chatbot"),
+      t("How do you reduce water usage?", "chatbot")
     ],
     page: 'sustainability'
   },
@@ -241,12 +242,13 @@ export const knowledgeBase = {
     ]
   },
   'order_placement': {
-    keywords: ['place order', 'place an order', 'buy', 'purchase', 'checkout', 'ordering', 'how to order', 'make order', 'ordering process', 'how can i order', 'how do i place'],
-    response: t("Placing an order with us is easy! You can order through our website by selecting your desired yarns, adding them to your cart, and proceeding to checkout. For bulk or custom orders, you can also email us at kspyarnskarur@gmail.com or call us at +91 9994955782. Our team will guide you through the ordering process and provide you with a detailed quote. We require minimum order quantities for certain yarn types, so please check product specifications or contact us for details.", "chatbot"),
+    keywords: ['place order', 'place an order', 'buy', 'purchase', 'checkout', 'ordering', 'how to order', 'make order', 'ordering process', 'how can i order', 'how do i place', 'want to buy', 'want to purchase'],
+    text: "To place an order with KSP Yarns, you have multiple convenient options: 1) Through our website - Browse our product catalog, select desired yarns with specifications, add to cart, and proceed to secure checkout. 2) Email orders - Send detailed requirements to kspyarnskarur@gmail.com including yarn type, count, quantity, and delivery address. 3) Phone orders - Call +91 9994955782 during business hours (Monday-Saturday, 9 AM-6 PM IST) to speak with our sales team. For bulk or custom orders, our team will provide detailed quotations, discuss specifications, arrange samples if needed, and guide you through the complete ordering process. Minimum order quantities vary by yarn type - please check specific product pages or contact us for MOQ details.",
+    response: t("Placing an order with KSP Yarns is simple and convenient:\n\n📱 Online: Browse our website, select products, and checkout securely\n📧 Email: Send requirements to kspyarnskarur@gmail.com\n☎️ Phone: Call +91 9994955782 (Mon-Sat, 9 AM-6 PM IST)\n\nFor bulk orders:\n• We provide detailed quotations\n• Sample cards available for quality evaluation\n• Custom specifications accepted\n• Flexible payment terms for B2B clients\n\nOur team will guide you through specifications, pricing, and delivery timelines. Minimum order quantities vary by product type.", "chatbot"),
     followUpQuestions: [
       t("What payment methods do you accept?", "chatbot"),
       t("What's your minimum order quantity?", "chatbot"),
-      t("How long will delivery take?", "chatbot")
+      t("Can I get samples before ordering?", "chatbot")
     ]
   },
   'custom': {
@@ -302,12 +304,13 @@ export const knowledgeBase = {
     ]
   },
   'quality': {
-    keywords: ['quality', 'standard', 'testing', 'check', 'control', 'assurance', 'inspection', 'consistency', 'defect'],
-    response: t("Quality is our priority. We implement a comprehensive quality management system with testing at every production stage. Our yarns undergo rigorous tests for count, strength, elongation, evenness, imperfections, and hairiness. We use advanced testing equipment including Uster technologies and follow international testing standards.", "chatbot"),
+    keywords: ['quality', 'standard', 'testing', 'check', 'control', 'assurance', 'inspection', 'consistency', 'defect', 'qc', 'qa', 'test'],
+    text: "Quality assurance is paramount at KSP Yarns. We implement a comprehensive multi-stage quality management system with rigorous testing at every production phase. Our quality control includes: 1) Raw material inspection and approval from certified suppliers, 2) In-process quality checks during blowroom, carding, drawing, roving, and spinning stages, 3) Final product testing using advanced Uster technologies for count accuracy (±2%), strength (minimum 85% CSP), elongation (5-8%), evenness (U% <12%), imperfections (IPI values within limits), and hairiness (H value monitoring). We use state-of-the-art testing equipment including Uster Tester 6, Tensorapid strength tester, and advanced moisture analyzers. Our quality team conducts batch consistency checks, color fastness testing (4-5 grade), and comprehensive reporting. We follow international testing standards including ASTM, ISO, and BS methods. Every batch is accompanied by quality certificates and test reports. We maintain 99.5% quality acceptance rate and offer quality guarantees with our products.",
+    response: t("Quality is our top priority at KSP Yarns:\n\n🔬 Testing Standards:\n• Count accuracy: ±2% tolerance\n• Strength: Minimum 85% CSP\n• Evenness: U% <12%\n• Comprehensive IPI testing\n• Color fastness: Grade 4-5\n\n🏭 Quality Control Process:\n• Raw material inspection\n• In-process monitoring at every stage\n• Advanced Uster technology testing\n• Batch consistency verification\n• Final product certification\n\n✅ What We Test:\n• Count, strength, and elongation\n• Evenness and imperfections\n• Hairiness and twist\n• Moisture content\n• Color fastness\n\nWe follow ASTM, ISO, and BS international standards, achieving 99.5% quality acceptance. Every batch includes detailed test reports.", "chatbot"),
     followUpQuestions: [
-      t("What quality tests do you perform?", "chatbot"),
-      t("Do you follow international quality standards?", "chatbot"),
-      t("How do you ensure batch consistency?", "chatbot")
+      t("What testing equipment do you use?", "chatbot"),
+      t("Can you provide quality certificates?", "chatbot"),
+      t("What are your quality standards?", "chatbot")
     ]
   },
   'innovation': {
