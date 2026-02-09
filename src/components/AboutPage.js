@@ -444,12 +444,13 @@ const SustainabilityMetricCard = ({ icon, label, percentage }) => {
 
 // NEW: Interactive Map Component to show Tamil Nadu presence
 const InteractiveMap = () => {
+  const { t } = useTranslation();
   const [activeLocation, setActiveLocation] = useState(null);
   const locations = [
-    { id: 1, name: "Coimbatore", x: 30, y: 70, details: "Main factory and headquarters" },
-    { id: 2, name: "Chennai", x: 80, y: 25, details: "Sales office and design center" },
-    { id: 3, name: "Karur", x: 50, y: 85, details: "Distribution center" },
-    { id: 4, name: "Salem", x: 45, y: 45, details: "Manufacturing unit" }
+    { id: 1, name: "Karur", x: 50, y: 85, details: "Head office and primary manufacturing facility" },
+    { id: 2, name: "Coimbatore", x: 30, y: 70, details: "Regional operations and sourcing support" },
+    { id: 3, name: "Chennai", x: 80, y: 25, details: "Sales office and customer support desk" },
+    { id: 4, name: "Salem", x: 45, y: 45, details: "Distribution and logistics coordination point" }
   ];
 
   return (
@@ -480,7 +481,7 @@ const InteractiveMap = () => {
               transition={{ duration: 1.5, repeat: Infinity }}
             />
             <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-blue-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-              {location.name}
+              {t(location.name, "about")}
             </div>
           </motion.div>
         ))}
@@ -496,15 +497,16 @@ const InteractiveMap = () => {
               transition={{ type: "spring", damping: 20 }}
             >
               <div className="flex justify-between items-start">
-                <h3 className="text-lg font-bold text-blue-800">{activeLocation.name}</h3>
-                <button 
+                <h3 className="text-lg font-bold text-blue-800">{t(activeLocation.name, "about")}</h3>
+                <button
                   onClick={() => setActiveLocation(null)}
                   className="text-gray-400 hover:text-gray-600"
+                  aria-label={t("Close", "common")}
                 >
-                  ✕
+                  X
                 </button>
               </div>
-              <p className="text-gray-600 mt-1">{activeLocation.details}</p>
+              <p className="text-gray-600 mt-1">{t(activeLocation.details, "about")}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -515,6 +517,7 @@ const InteractiveMap = () => {
 
 // NEW: InfoCard component for quick facts
 const InfoCard = ({ title, content, icon }) => {
+  const { t } = useTranslation();
   const [isFlipped, setIsFlipped] = useState(false);
   
   return (
@@ -537,8 +540,8 @@ const InfoCard = ({ title, content, icon }) => {
           style={{ backfaceVisibility: "hidden" }}
         >
           {icon && React.cloneElement(icon, { className: "text-4xl mb-3" })}
-          <h3 className="text-xl font-bold text-center">{title}</h3>
-          <div className="mt-4 text-sm text-blue-100">Click to learn more</div>
+          <h3 className="text-xl font-bold text-center">{t(title, "about")}</h3>
+          <div className="mt-4 text-sm text-blue-100">{t("Click to learn more", "about")}</div>
         </div>
         
         {/* Back of card */}
@@ -546,7 +549,7 @@ const InfoCard = ({ title, content, icon }) => {
           className="absolute inset-0 bg-white rounded-xl p-6 border border-blue-100 flex items-center justify-center backface-hidden"
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
-          <p className="text-gray-700 text-center">{content}</p>
+          <p className="text-gray-700 text-center">{t(content, "about")}</p>
         </div>
       </motion.div>
     </motion.div>
@@ -561,41 +564,41 @@ const AboutPage = () => {
   // Reference for parallax effect
   const containerRef = useRef(null);
   
-  // Updated and enhanced achievements for Tamil Nadu local company
+  // Company milestones aligned with organization profile across the app
   const achievements = [
     { 
-      year: 2020, 
+      year: 2005, 
       title: "Company Foundation",
-      description: "KSP Yarns was founded in Coimbatore with a vision to blend traditional Tamil Nadu textile heritage with modern manufacturing practices.",
-      achievement: "Successfully established first production line with 25 employees",
+      description: "KSP Yarns was founded in Karur, Tamil Nadu, beginning as a focused yarn trading business.",
+      achievement: "Built a trusted network with regional textile buyers",
       icon: <FaSeedling />
     },
     { 
-      year: 2021, 
-      title: "Market Expansion",
-      description: "Secured partnerships with key Tamil Nadu retailers, expanding our reach to Chennai, Madurai, and Trichy markets. Introduced eco-friendly yarn variants.",
-      achievement: "First major retail partnership with Chennai Textiles",
+      year: 2008, 
+      title: "Manufacturing Expansion",
+      description: "Established our first manufacturing facility and started scaled production for cotton and blended yarns.",
+      achievement: "Transitioned from trading to integrated manufacturing",
       icon: <FaUsers />
     },
     { 
       year: 2022, 
       title: "Quality Recognition",
-      description: "Achieved Tamil Nadu Quality Certification for our manufacturing processes and product standards. Expanded our eco-friendly yarn offerings.",
-      achievement: "Silver medal at Tamil Nadu Textile Exhibition",
+      description: "Achieved ISO 9001 certification, strengthening process control and product quality consistency.",
+      achievement: "ISO 9001 certified quality management system",
       icon: <FaTrophy />
     },
     { 
-      year: 2023, 
-      title: "Manufacturing Excellence",
-      description: "Recognized as the Best Local Textile Manufacturer in the annual Tamil Nadu Business Awards. Expanded production capacity by 40%.",
-      achievement: "Best Local Textile Manufacturer Award",
+      year: 2018, 
+      title: "Market Expansion",
+      description: "Expanded into international markets and grew supply capabilities for export-focused customers.",
+      achievement: "Established long-term global customer partnerships",
       icon: <FaLandmark />
     },
     {
-      year: 2024,
+      year: 2020,
       title: "Sustainable Innovation",
-      description: "Launched revolutionary water-conserving production methods, reducing water usage by 65%. Introduced new organic cotton yarn product line.",
-      achievement: "Tamil Nadu Green Business Certification",
+      description: "Scaled sustainable yarn initiatives and strengthened certification-driven production standards.",
+      achievement: "Expanded eco-focused product portfolio for global buyers",
       icon: <FaLeaf />
     }
   ];
@@ -654,7 +657,7 @@ const AboutPage = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         >
-          {t("Tamil Nadu's premier textile manufacturer since 2020", "about")}
+          {t("Tamil Nadu's trusted textile manufacturer since 2005", "about")}
         </motion.p>
       </motion.div>
 
@@ -709,7 +712,7 @@ const AboutPage = () => {
 
       {/* History Section */}
       <AnimatedSection icon={<FaHistory />} title="Our History" delay={0.1}>
-        {t("Founded in 2020 in Coimbatore, KSP Yarns has quickly become one of Tamil Nadu's most respected textile manufacturers. What began as a small family workshop has grown into a significant regional producer of quality yarns, serving businesses throughout Tamil Nadu. Our journey reflects our deep commitment to Tamil craftsmanship and heritage.", "about")}
+        {t("Founded in 2005 in Karur, KSP Yarns began as a yarn trading business and steadily evolved into a full-scale manufacturer. Over the years, we expanded operations, strengthened quality systems, and built long-term relationships across domestic and international markets.", "about")}
       </AnimatedSection>
 
       {/* Tamil Nadu Heritage Section */}
@@ -755,7 +758,7 @@ const AboutPage = () => {
           </div>
           
           <p className="text-gray-700 mb-8 text-lg">
-            {t("At KSP Yarns, we're committed to preserving Tamil Nadu's natural beauty through sustainable manufacturing. Our Coimbatore facility utilizes solar energy, water conservation systems, and comprehensive waste reduction protocols. We source materials locally whenever possible, supporting Tamil Nadu's economy while reducing our carbon footprint.", "about")}
+            {t("At KSP Yarns, we are committed to preserving Tamil Nadu's natural resources through responsible manufacturing. Our Karur operations use energy-efficient systems, water conservation practices, and structured waste reduction programs. We source materials locally whenever possible to support regional livelihoods and reduce transport-related emissions.", "about")}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
@@ -789,7 +792,7 @@ const AboutPage = () => {
           {t("Our Tamil Nadu Journey", "about")}
         </motion.h2>
         <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto px-4">
-          {t("Explore our company's milestones as we've grown from a small Coimbatore workshop to one of Tamil Nadu's premier textile manufacturers.", "about")}
+          {t("Explore our company milestones as we grew from a small Karur trading setup into one of Tamil Nadu's reliable textile manufacturers.", "about")}
         </p>
         <Timeline events={achievements} />
       </motion.div>
@@ -800,3 +803,4 @@ const AboutPage = () => {
 };
 
 export default AboutPage;
+

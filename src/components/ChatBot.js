@@ -3,15 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaRobot, FaComments, FaTimes, FaPaperPlane, FaSpinner, FaLightbulb, FaMicrophone, 
          FaThumbsUp, FaThumbsDown, FaRegSmile, FaRegCopy, FaVolumeUp } from 'react-icons/fa';
 import { useTranslation } from '../utils/TranslationContext';
-import { knowledgeBase, extendedKnowledgeBase } from '../data/chatbotKnowledgeBase';
+import { knowledgeBase, extendedKnowledgeBase, buildSmartResponse, getVariation, matchFAQ, generateComparisonResponse } from '../data/chatbotKnowledgeBase';
 import { preprocessText, calculateSimilarity, detectIntent, extractEntities, 
-         generateContextualResponse, calculateRelevanceScore } from '../utils/nlpUtils';
+         generateContextualResponse, calculateRelevanceScore, analyzeSentiment,
+         correctSpelling, advancedPreprocess, detectQuestionType, 
+         generateClarifyingQuestion, extractPreferences, updateConversationMemory } from '../utils/nlpUtils';
 
 const ChatBot = () => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   // Start with greeting visible by default
-  const [showGreeting, setShowGreeting] = useState(true);
+  const [showGreeting, setShowGreeting] = useState(false);
   const [messages, setMessages] = useState(() => {
     const savedMessages = localStorage.getItem('kspChatHistory');
     if (savedMessages) {
@@ -65,7 +67,11 @@ const ChatBot = () => {
       lastTopic: null,
       userName: null,
       recentTopics: [],
-      messageCount: 0
+      messageCount: 0,
+      preferences: {},
+      conversationHistory: [],
+      lastInteraction: null,
+      sessionStarted: new Date().toISOString()
     };
   });
   const [suggestedQuestions, setSuggestedQuestions] = useState([
@@ -157,21 +163,21 @@ const ChatBot = () => {
   // Show greeting only on first visit
   useEffect(() => {
     const greetingShown = localStorage.getItem('kspGreetingShown');
-    
-    if (!greetingShown) {
-      // Show greeting with slight delay after page loads
-      const timer = setTimeout(() => {
-        setShowGreeting(true);
-        
-        // Hide after 8 seconds
-        setTimeout(() => {
-          setShowGreeting(false);
-          localStorage.setItem('kspGreetingShown', 'true');
-        }, 8000);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+    if (greetingShown) {
+      setShowGreeting(false);
+      return;
     }
+
+    const showTimer = setTimeout(() => setShowGreeting(true), 1000);
+    const hideTimer = setTimeout(() => {
+      setShowGreeting(false);
+      localStorage.setItem('kspGreetingShown', 'true');
+    }, 9000);
+
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
   }, []); // Empty dependency array means this runs once on mount
 
   const toggleChat = useCallback(() => {
@@ -218,13 +224,25 @@ const ChatBot = () => {
     return newVisitorPatterns.some(pattern => pattern.test(message));
   }, []);
 
-  const updateConversationContext = useCallback((topic) => {
+  const updateConversationContext = useCallback((topic, additionalContext = {}) => {
     setConversationContext(prev => {
-      const recentTopics = [topic, ...prev.recentTopics.slice(0, 2)];
+      const recentTopics = [topic, ...prev.recentTopics.slice(0, 4)];
+      const now = new Date().toISOString();
+      
+      // Track conversation history for better context
+      const conversationHistory = [
+        ...(prev.conversationHistory || []).slice(-10),
+        { topic, timestamp: now, ...additionalContext }
+      ];
+      
       return {
         ...prev,
         lastTopic: topic,
-        recentTopics: recentTopics.filter((v, i, a) => a.indexOf(v) === i)
+        recentTopics: recentTopics.filter((v, i, a) => a.indexOf(v) === i),
+        messageCount: (prev.messageCount || 0) + 1,
+        conversationHistory,
+        lastInteraction: now,
+        ...additionalContext
       };
     });
   }, []);
@@ -232,6 +250,11 @@ const ChatBot = () => {
   // Now findBotResponse can use these functions in its dependency array
   const findBotResponse = useCallback((userMessage) => {
     const normalizedMessage = userMessage.toLowerCase();
+    
+    // Advanced preprocessing with spelling correction and sentiment
+    const { corrected: correctedMessage, sentiment } = advancedPreprocess(userMessage);
+    
+    // Extract user name if mentioned
     const possibleName = extractUserName(userMessage);
     if (possibleName) {
       setConversationContext(prev => ({
@@ -240,48 +263,119 @@ const ChatBot = () => {
       }));
     }
     
-    // Extract user intent and entities for better understanding
-    const userIntent = detectIntent(userMessage);
-    const entities = extractEntities(userMessage);
+    // Extract user intent with enhanced detection (now returns object with confidence)
+    const intentResult = detectIntent(userMessage);
+    const userIntent = typeof intentResult === 'object' ? intentResult.name : intentResult;
+    const intentConfidence = typeof intentResult === 'object' ? intentResult.confidence : 0.5;
+    
+    // Extract entities for better understanding
+    const entities = extractEntities(correctedMessage);
+    
+    // Extract and save user preferences
+    const preferences = extractPreferences(userMessage, conversationContext.preferences);
+    if (Object.keys(preferences).length > 0) {
+      setConversationContext(prev => ({
+        ...prev,
+        preferences: { ...prev.preferences, ...preferences }
+      }));
+    }
 
     // Pre-process the user message for NLP matching
-    // eslint-disable-next-line no-unused-vars
-    const processedUserMessage = preprocessText(userMessage).join(' ');
+    const processedUserMessage = preprocessText(correctedMessage, { expandSynonyms: true }).join(' ');
     
-    // Handle basic intents first with higher priority
-    if (userIntent === 'greeting') {
+    // Check for FAQ matches first (common questions with quick answers)
+    const faqMatch = matchFAQ(correctedMessage);
+    if (faqMatch) {
+      updateConversationContext('faq');
+      setSuggestedQuestions([
+        t("What products do you offer?", "chatbot"),
+        t("How do I place an order?", "chatbot"),
+        t("Tell me about your company", "chatbot")
+      ]);
+      return faqMatch.answer;
+    }
+    
+    // Check for comparison queries
+    const comparisonPatterns = [
+      { regex: /\b(cotton)\b.*\b(polyester|poly)\b/i, items: ['cotton', 'polyester'] },
+      { regex: /\b(polyester|poly)\b.*\b(cotton)\b/i, items: ['cotton', 'polyester'] },
+      { regex: /\b(ring)\s*(spun|spinning)?\b.*\b(open\s*end|oe)\b/i, items: ['ring', 'openend'] },
+      { regex: /\b(open\s*end|oe)\b.*\b(ring)\s*(spun|spinning)?\b/i, items: ['ring', 'openend'] },
+      { regex: /\b(organic)\b.*\b(recycled)\b/i, items: ['organic', 'recycled'] },
+      { regex: /\b(recycled)\b.*\b(organic)\b/i, items: ['organic', 'recycled'] },
+    ];
+    
+    for (const pattern of comparisonPatterns) {
+      if (pattern.regex.test(correctedMessage)) {
+        const comparisonResponse = generateComparisonResponse(pattern.items[0], pattern.items[1]);
+        if (comparisonResponse) {
+          updateConversationContext('comparison');
+          setSuggestedQuestions([
+            t("Which yarn do you recommend for my project?", "chatbot"),
+            t("Can I get samples of both?", "chatbot"),
+            t("What are the prices for these yarns?", "chatbot")
+          ]);
+          return comparisonResponse;
+        }
+      }
+    }
+    
+    // Handle basic intents first with higher priority (only if high confidence)
+    if (userIntent === 'greeting' && intentConfidence > 0.6) {
       updateConversationContext('greeting');
       
       if (typeof knowledgeBase.greeting.response === 'function') {
         const response = knowledgeBase.greeting.response(conversationContext);
         setSuggestedQuestions(knowledgeBase.greeting.followUpQuestions || []);
-        return response;
+        return buildSmartResponse(response, { isFirstMessage: conversationContext.messageCount < 2 });
       }
       
       setSuggestedQuestions(knowledgeBase.greeting.followUpQuestions || []);
-      return knowledgeBase.greeting.response;
+      return buildSmartResponse(knowledgeBase.greeting.response, { isFirstMessage: conversationContext.messageCount < 2 });
     }
     
-    if (userIntent === 'farewell') {
+    if (userIntent === 'farewell' && intentConfidence > 0.6) {
       updateConversationContext('goodbye');
       setSuggestedQuestions(knowledgeBase.goodbye.followUpQuestions || []);
       return knowledgeBase.goodbye.response;
     }
     
-    if (userIntent === 'gratitude') {
+    if (userIntent === 'gratitude' && intentConfidence > 0.6) {
       updateConversationContext('thanks');
       setSuggestedQuestions(knowledgeBase.thanks.followUpQuestions || []);
-      return knowledgeBase.thanks.response;
+      // Add variation to gratitude responses
+      const thankResponses = [
+        knowledgeBase.thanks.response,
+        t("You're welcome! Let me know if you need anything else.", "chatbot"),
+        t("Happy to help! Feel free to ask more questions.", "chatbot"),
+        t("My pleasure! Is there anything else you'd like to know?", "chatbot")
+      ];
+      return thankResponses[Math.floor(Math.random() * thankResponses.length)];
+    }
+    
+    // Handle complaints with empathy
+    if (userIntent === 'complaint' && intentConfidence > 0.5) {
+      updateConversationContext('complaint');
+      const empathyResponse = t("I'm sorry to hear you're experiencing issues. Let me help you resolve this. ", "chatbot");
+      
+      if (sentiment.label === 'negative') {
+        setSuggestedQuestions([
+          t("I need to speak with customer service", "chatbot"),
+          t("How do I request a refund?", "chatbot"),
+          t("What's your return policy?", "chatbot")
+        ]);
+        return empathyResponse + t("Could you please tell me more about the issue? You can also contact our support team at kspyarnskarur@gmail.com or +91 9994955782 for immediate assistance.", "chatbot");
+      }
     }
     
     // Enhanced matching with multiple scoring methods
-    const scoringResults = extendedKnowledgeBase.map(entry => {
-      // Method 1: Semantic similarity
-      const semanticScore = calculateSimilarity(userMessage, entry.originalText);
+    const scoringResults = (extendedKnowledgeBase || []).map(entry => {
+      // Method 1: Semantic similarity with corrected text
+      const semanticScore = calculateSimilarity(correctedMessage, entry.originalText);
       
-      // Method 2: Relevance score (includes keyword matching)
+      // Method 2: Enhanced relevance score (includes keyword matching and fuzzy matching)
       const relevanceScore = calculateRelevanceScore(
-        userMessage, 
+        correctedMessage, 
         entry.originalText, 
         entry.keywords || []
       );
@@ -292,31 +386,64 @@ const ChatBot = () => {
         const hasYarnType = entry.keywords?.some(kw => 
           entities.yarnTypes.some(yt => kw.toLowerCase().includes(yt.toLowerCase()))
         );
-        if (hasYarnType) entityBonus = 0.2;
+        if (hasYarnType) entityBonus = 0.25;
       }
       
       if (entities.certifications.length > 0) {
         const hasCertification = entry.keywords?.some(kw => 
           entities.certifications.some(cert => kw.toLowerCase().includes(cert.toLowerCase()))
         );
-        if (hasCertification) entityBonus += 0.15;
+        if (hasCertification) entityBonus += 0.2;
+      }
+      
+      if (entities.colors.length > 0) {
+        if (entry.topic === 'colors') entityBonus += 0.15;
       }
       
       // Method 4: Intent-based bonus
       let intentBonus = 0;
-      if (userIntent === 'purchase' && entry.topic.includes('order')) {
-        intentBonus = 0.15;
-      } else if (userIntent === 'information' && entry.topic.includes('company')) {
-        intentBonus = 0.1;
-      } else if (userIntent === 'specification' && entry.topic.includes('specification')) {
+      if (userIntent === 'purchase' && (entry.topic.includes('order') || entry.topic.includes('price'))) {
         intentBonus = 0.2;
+      } else if (userIntent === 'information' && entry.topic.includes('company')) {
+        intentBonus = 0.15;
+      } else if (userIntent === 'specification' && (entry.topic.includes('specification') || entry.topic.includes('quality'))) {
+        intentBonus = 0.25;
       } else if (userIntent === 'comparison' && entry.topic.includes('yarn')) {
-        intentBonus = 0.1;
+        intentBonus = 0.15;
+      } else if (userIntent === 'shipping' && entry.topic.includes('shipping')) {
+        intentBonus = 0.25;
+      } else if (userIntent === 'sustainability' && (entry.topic.includes('sustainability') || entry.topic.includes('eco'))) {
+        intentBonus = 0.25;
+      } else if (userIntent === 'samples' && entry.topic.includes('sample')) {
+        intentBonus = 0.25;
+      } else if (userIntent === 'contact' && entry.topic.includes('contact')) {
+        intentBonus = 0.25;
+      } else if (userIntent === 'cancellation' && (entry.topic.includes('cancel') || entry.topic.includes('return'))) {
+        intentBonus = 0.25;
+      }
+      
+      // Method 5: Context continuity bonus
+      let contextBonus = 0;
+      if (conversationContext.lastTopic && conversationContext.lastTopic === entry.topic) {
+        contextBonus = 0.05; // Small boost for topic continuity
+      }
+      
+      // Method 6: User preference matching
+      let preferenceBonus = 0;
+      if (conversationContext.preferences) {
+        if (conversationContext.preferences.sustainabilityFocused && 
+            (entry.topic.includes('sustainability') || entry.topic.includes('recycled') || entry.topic.includes('organic'))) {
+          preferenceBonus = 0.1;
+        }
+        if (conversationContext.preferences.preferredYarnType && 
+            entry.keywords?.some(kw => kw.includes(conversationContext.preferences.preferredYarnType))) {
+          preferenceBonus += 0.1;
+        }
       }
       
       // Combined weighted score
-      const finalScore = (semanticScore * 0.4) + (relevanceScore * 0.35) + 
-                        entityBonus + intentBonus;
+      const finalScore = (semanticScore * 0.3) + (relevanceScore * 0.35) + 
+                        entityBonus + intentBonus + contextBonus + preferenceBonus;
       
       return {
         topic: entry.topic,
@@ -330,48 +457,69 @@ const ChatBot = () => {
     
     // Sort by final score (highest first)
     scoringResults.sort((a, b) => b.score - a.score);
-    
-    // Use adaptive threshold based on top scores
-    const topScore = scoringResults[0].score;
-    const secondScore = scoringResults[1]?.score || 0;
-    const scoreGap = topScore - secondScore;
-    
-    // If there's a clear winner (good score gap), use lower threshold
-    const adaptiveThreshold = scoreGap > 0.15 ? 0.2 : 0.3;
-    
-    // Use the best match if it meets the threshold
-    if (topScore > adaptiveThreshold) {
-      const bestTopic = scoringResults[0].topic;
-      updateConversationContext(bestTopic);
-      
-      // Find the matched topic in the knowledge base
-      const matchedEntry = knowledgeBase[bestTopic];
-      
-      if (!matchedEntry) {
-        return t("I'm not sure I have information about that. Could you please ask something else?", "chatbot");
+
+    if (scoringResults.length > 0) {
+      // Use adaptive threshold based on top scores
+      const topScore = scoringResults[0].score;
+      const secondScore = scoringResults[1]?.score || 0;
+      const scoreGap = topScore - secondScore;
+      const adaptiveThreshold = scoreGap > 0.15 ? 0.18 : 0.25;
+
+      if (topScore > adaptiveThreshold) {
+        const bestTopic = scoringResults[0].topic;
+        updateConversationContext(bestTopic);
+        
+        // Find the matched topic in the knowledge base
+        const matchedEntry = knowledgeBase[bestTopic];
+        
+        if (!matchedEntry) {
+          return t("I'm not sure I have information about that. Could you please ask something else?", "chatbot");
+        }
+        
+        // Generate a contextual response based on the matched entry
+        setSuggestedQuestions(matchedEntry.followUpQuestions || []);
+        
+        if (typeof matchedEntry.response === 'function') {
+          const baseResponse = matchedEntry.response(conversationContext);
+          return buildSmartResponse(baseResponse, { messageCount: conversationContext.messageCount });
+        }
+        
+        // Generate personalized response using the enhanced context
+        const contextualResponse = generateContextualResponse(
+          correctedMessage, 
+          matchedEntry.response, 
+          conversationContext
+        );
+        
+        return buildSmartResponse(contextualResponse || matchedEntry.response, { messageCount: conversationContext.messageCount });
       }
-      
-      // Generate a contextual response based on the matched entry
-      setSuggestedQuestions(matchedEntry.followUpQuestions || []);
-      
-      if (typeof matchedEntry.response === 'function') {
-        return matchedEntry.response(conversationContext);
+
+      // Medium confidence - provide clarification
+      if (topScore > 0.10) {
+        const likelyTopic = scoringResults[0].topic;
+        const tentativeEntry = knowledgeBase[likelyTopic];
+        
+        // Generate clarifying question
+        const clarifyingQuestion = generateClarifyingQuestion(userMessage, scoringResults.slice(0, 3), entities);
+        
+        if (clarifyingQuestion) {
+          setSuggestedQuestions(tentativeEntry?.followUpQuestions || []);
+          return clarifyingQuestion;
+        }
+        
+        const topicHint = tentativeEntry?.response ? tentativeEntry.response.split('.')[0] : likelyTopic.replace(/_/g, ' ');
+        setSuggestedQuestions(tentativeEntry?.followUpQuestions || []);
+        return t(
+          `I think you're asking about ${likelyTopic.replace(/_/g, ' ')}. ${topicHint || ''} Could you please provide more details like yarn type, count, or quantity so I can give you a more precise answer?`,
+          "chatbot"
+        );
       }
-      
-      // Generate personalized response using the enhanced context
-      const contextualResponse = generateContextualResponse(
-        userMessage, 
-        matchedEntry.response, 
-        conversationContext
-      );
-      
-      return contextualResponse || matchedEntry.response;
     }
     
     // Handle specific cases that might not match well with similarity
     
-    // Special handling for cancellation-related queries
-    if (/canc|cncl|cansl|ordr|orer|oredr/i.test(normalizedMessage)) {
+    // Special handling for cancellation-related queries with fuzzy matching
+    if (/canc|cncl|cansl|ordr|orer|oredr|refun/i.test(normalizedMessage)) {
       updateConversationContext('cancellation');
       setSuggestedQuestions(knowledgeBase.cancellation.followUpQuestions || []);
       return knowledgeBase.cancellation.response;
@@ -383,13 +531,13 @@ const ChatBot = () => {
       return t("Welcome to KSP Yarns! We're a leading manufacturer of high-quality yarns with a focus on sustainability. How can I help you today?", "chatbot");
     }
     
-    // Enhanced fallback with suggestions based on detected intent
+    // Enhanced fallback with smart suggestions based on detected intent and entities
     let fallbackSuggestions = [];
     if (userIntent === 'purchase') {
       fallbackSuggestions = [
         t("How do I place an order?", "chatbot"),
         t("What are your prices?", "chatbot"),
-        t("What products do you offer?", "chatbot")
+        t("What's your minimum order quantity?", "chatbot")
       ];
     } else if (userIntent === 'information') {
       fallbackSuggestions = [
@@ -397,7 +545,26 @@ const ChatBot = () => {
         t("What products do you offer?", "chatbot"),
         t("What certifications do you have?", "chatbot")
       ];
+    } else if (userIntent === 'specification') {
+      fallbackSuggestions = [
+        t("What yarn counts do you offer?", "chatbot"),
+        t("Can you provide technical data sheets?", "chatbot"),
+        t("Do you have GOTS or GRS certified yarns?", "chatbot")
+      ];
+    } else if (userIntent === 'shipping') {
+      fallbackSuggestions = [
+        t("What are your shipping options?", "chatbot"),
+        t("How long does delivery take?", "chatbot"),
+        t("Do you ship internationally?", "chatbot")
+      ];
+    } else if (userIntent === 'sustainability') {
+      fallbackSuggestions = [
+        t("Tell me about your recycled yarns", "chatbot"),
+        t("What sustainability certifications do you have?", "chatbot"),
+        t("Do you offer organic cotton yarns?", "chatbot")
+      ];
     } else {
+      // Default suggestions with variation
       fallbackSuggestions = [
         t("What products do you offer?", "chatbot"),
         t("How do I place an order?", "chatbot"),
@@ -406,13 +573,29 @@ const ChatBot = () => {
     }
     
     setSuggestedQuestions(fallbackSuggestions);
-    
-    // Default fallback response with intent-aware messaging
-    if (entities.yarnTypes.length > 0) {
-      return t(`I understand you're asking about ${entities.yarnTypes.join(', ')} yarns. Could you please be more specific? I can help with product details, pricing, ordering, or specifications.`, "chatbot");
+
+    // Smart fallback based on detected entities
+    if (entities.yarnTypes.length > 0 || entities.counts.length > 0) {
+      const yarnMention = entities.yarnTypes.join(', ');
+      const countMention = entities.counts.join(', ');
+      return t(
+        `I see you're interested in ${yarnMention || 'specific'} yarns${countMention ? ` (counts: ${countMention})` : ''}. To give you the best information, please let me know:\n• Required yarn count (Ne)\n• Quantity needed\n• Delivery destination\n• Any specific certifications (GOTS, GRS, etc.)\n\nI can then provide detailed pricing and availability.`,
+        "chatbot"
+      );
     }
     
-    return t("I'm not sure I understand. Could you please rephrase your question? I can help with information about our products, sustainability practices, ordering process, or company information.", "chatbot");
+    // Context-aware fallback
+    if (conversationContext.lastTopic) {
+      const relatedSuggestion = knowledgeBase[conversationContext.lastTopic]?.followUpQuestions?.[0] || '';
+      if (relatedSuggestion) {
+        return t(
+          `I'm not quite sure what you're asking. Were you still interested in ${conversationContext.lastTopic.replace(/_/g, ' ')}? Or try asking about:\n• Our yarn products and specifications\n• Pricing and bulk orders\n• Shipping and delivery\n• Quality certifications`,
+          "chatbot"
+        );
+      }
+    }
+
+    return t("I'd be happy to help! Could you please specify what you're looking for? I can assist with:\n\n• 🧵 Yarn products (cotton, polyester, blends)\n• 💰 Pricing and ordering\n• 🚚 Shipping information\n• 📋 Quality certifications\n• 🌱 Sustainability practices\n\nJust let me know your requirements!", "chatbot");
   }, [conversationContext, extractUserName, isNewVisitorGreeting, t, updateConversationContext]);
 
   // Define handleSendMessage before it's used in handleKeyDown
@@ -688,16 +871,25 @@ const ChatBot = () => {
         reaction: null
       }]);
       
-      setConversationContext(prev => ({
-        ...prev,
+      setConversationContext({
         lastTopic: null,
+        userName: null,
         recentTopics: [],
         messageCount: 0
-      }));
+      });
       
       localStorage.removeItem('kspChatHistory');
+      localStorage.removeItem('kspChatContext');
     }
   }, [t]); // Added 't' dependency
+
+  useEffect(() => {
+    setSuggestedQuestions([
+      t("What products do you offer?", "chatbot"),
+      t("How do I place an order?", "chatbot"),
+      t("Tell me about your sustainability practices", "chatbot"),
+    ]);
+  }, [t]);
 
   const copyToClipboard = useCallback((text) => {
     if (!text) return;

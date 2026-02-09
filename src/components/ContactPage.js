@@ -45,6 +45,7 @@ const AnimatedBackground = () => {
 
 // Back to Top Button
 const BackToTopButton = () => {
+  const { t } = useTranslation();
   const { scrollYProgress } = useScroll();
   const [visible, setVisible] = useState(false);
   
@@ -70,7 +71,7 @@ const BackToTopButton = () => {
           exit={{ opacity: 0, y: 20 }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          aria-label="Back to top"
+          aria-label={t('Back to top', 'contact')}
         >
           <FaArrowUp />
         </motion.button>
@@ -83,7 +84,7 @@ const BackToTopButton = () => {
 const ContactCard = ({ t }) => {
   const handleDownload = () => {
     // Logic to download vCard or contact information
-    alert('Contact card download functionality would be implemented here');
+    alert(t('Contact card download functionality would be implemented here', 'contact'));
   };
   
   return (
@@ -337,10 +338,10 @@ const ContactPage = () => {
   ];
 
   const socialLinks = [
-    { icon: FaFacebook, url: "https://facebook.com", color: "text-blue-600", tooltip: "Facebook" },
-    { icon: FaInstagram, url: "https://instagram.com", color: "text-pink-600", tooltip: "Instagram" },
-    { icon: FaLinkedin, url: "https://linkedin.com", color: "text-blue-700", tooltip: "LinkedIn" },
-    { icon: FaTwitter, url: "https://twitter.com", color: "text-blue-400", tooltip: "Twitter" }
+    { icon: FaFacebook, url: "https://facebook.com", color: "text-blue-600", tooltip: t("Facebook", "contact") },
+    { icon: FaInstagram, url: "https://instagram.com", color: "text-pink-600", tooltip: t("Instagram", "contact") },
+    { icon: FaLinkedin, url: "https://linkedin.com", color: "text-blue-700", tooltip: t("LinkedIn", "contact") },
+    { icon: FaTwitter, url: "https://twitter.com", color: "text-blue-400", tooltip: t("Twitter", "contact") }
   ];
 
   // Form field labels and placeholders

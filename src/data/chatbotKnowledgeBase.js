@@ -1,4 +1,4 @@
-import { preprocessText } from '../utils/nlpUtils';
+﻿import { preprocessText, correctSpelling, analyzeSentiment, fuzzyMatchWord, levenshteinDistance } from '../utils/nlpUtils';
 
 // Helper function to use outside of React components
 const t = (text, namespace) => {
@@ -7,7 +7,7 @@ const t = (text, namespace) => {
   return text;
 };
 
-// Helper function for fuzzy matching to handle typos
+// Enhanced fuzzy matching with Levenshtein distance
 export const fuzzyMatch = (text, keyword) => {
   if (!text || !keyword) return false;
   
@@ -18,30 +18,187 @@ export const fuzzyMatch = (text, keyword) => {
   // Direct match
   if (textLower.includes(keywordLower)) return true;
   
-  // Common misspellings
-  const commonMisspellings = {
-    'cancel': ['cancle', 'cancell', 'canel', 'cncel', 'cacnel'],
-    'order': ['oredr', 'ordr', 'oder', 'ordder'],
-    'refund': ['refnd', 'refudn', 'rfund', 'refaund'],
-    'return': ['retrun', 'retrn', 'reutrn', 'retunr']
-  };
+  // Use fuzzy word matching for individual words
+  const textWords = textLower.split(/\s+/);
+  const keywordWords = keywordLower.split(/\s+/);
   
-  // Check if the keyword has common misspellings
-  for (const [word, misspellings] of Object.entries(commonMisspellings)) {
-    if (keywordLower.includes(word) || misspellings.some(misspelled => keywordLower.includes(misspelled))) {
-      // Check if any of the misspellings are in the text
-      if (textLower.includes(word)) return true;
-      if (misspellings.some(misspelled => textLower.includes(misspelled))) return true;
+  for (const textWord of textWords) {
+    for (const keywordWord of keywordWords) {
+      if (fuzzyMatchWord(textWord, keywordWord, 0.3)) {
+        return true;
+      }
     }
   }
   
-  // Levenshtein distance for words that are very similar
-  // Simplified implementation - words with small edit distances are considered matches
-  if (keywordLower.length > 3 && textLower.includes(keywordLower.substring(0, 3))) {
-    return true;
+  return false;
+};
+
+// Intelligent response variations to avoid repetition
+const responseVariations = {
+  greetings: [
+    "Hello! How can I assist you today?",
+    "Hi there! What can I help you with?",
+    "Welcome! I'm here to help with any questions.",
+    "Greetings! How may I be of service?",
+  ],
+  acknowledgments: [
+    "I understand.",
+    "Got it!",
+    "I see what you mean.",
+    "Thanks for clarifying.",
+  ],
+  transitions: [
+    "Additionally,",
+    "Furthermore,",
+    "Also worth noting,",
+    "On that note,",
+  ],
+  followUps: [
+    "Is there anything else you'd like to know?",
+    "What else can I help you with?",
+    "Do you have any other questions?",
+    "Would you like more information on anything?",
+  ]
+};
+
+// Get a random variation
+export const getVariation = (type) => {
+  const variations = responseVariations[type];
+  if (!variations) return '';
+  return variations[Math.floor(Math.random() * variations.length)];
+};
+
+// Smart response builder that adapts to conversation context
+export const buildSmartResponse = (baseResponse, context = {}) => {
+  let response = baseResponse;
+  
+  // Add greeting variation for new conversations
+  if (context.isFirstMessage && !response.toLowerCase().startsWith('hello')) {
+    response = getVariation('greetings').split('!')[0] + '! ' + response;
   }
   
-  return false;
+  // Add follow-up for engaged users
+  if (context.messageCount > 5 && Math.random() > 0.7 && !response.endsWith('?')) {
+    response += ' ' + getVariation('followUps');
+  }
+  
+  return response;
+};
+
+// Conversational patterns for more natural responses
+export const conversationalPatterns = {
+  // Handle "yes" and "no" responses based on last topic
+  confirmation: {
+    patterns: [/^(yes|yeah|yep|sure|ok|okay|yup|affirmative)$/i],
+    handler: (context) => {
+      const lastTopic = context.lastTopic;
+      const responses = {
+        'products': t("Great! Which specific yarn type interests you - cotton, polyester, or blended yarns?", "chatbot"),
+        'samples': t("Perfect! To request samples, please email us at kspyarnskarur@gmail.com with your requirements and shipping address.", "chatbot"),
+        'order_placement': t("Excellent! You can place orders through our website, email (kspyarnskarur@gmail.com), or call us at +91 9994955782.", "chatbot"),
+        'price': t("I'd be happy to help with pricing! Please share the yarn type, count, and quantity you need for an accurate quote.", "chatbot"),
+        'default': t("Great! How can I help you further?", "chatbot")
+      };
+      return responses[lastTopic] || responses['default'];
+    }
+  },
+  negation: {
+    patterns: [/^(no|nope|nah|not really|never mind)$/i],
+    handler: (context) => {
+      return t("No problem! Is there something else I can help you with?", "chatbot");
+    }
+  }
+};
+
+// Comparison templates for yarn types
+export const yarnComparisons = {
+  'cotton_vs_polyester': {
+    cotton: ['Natural fiber', 'Breathable', 'Soft texture', 'Biodegradable', 'Good moisture absorption', 'Better for sensitive skin'],
+    polyester: ['Synthetic fiber', 'Durable', 'Wrinkle-resistant', 'Quick-drying', 'Color-fast', 'More affordable'],
+    recommendation: t("Cotton is ideal for comfort wear and sensitive skin, while polyester excels in durability and performance wear. Consider poly-cotton blends for the best of both worlds!", "chatbot")
+  },
+  'ring_vs_openend': {
+    ringSpun: ['Higher strength', 'Softer feel', 'Premium quality', 'Fine count capability', 'Less hairiness', 'Better for fine fabrics'],
+    openEnd: ['Cost-effective', 'Good uniformity', 'Faster production', 'Medium to coarse counts', 'Good abrasion resistance', 'Ideal for denim'],
+    recommendation: t("Ring-spun yarn is best for premium applications requiring softness and strength, while open-end yarn is ideal for cost-effective bulk production.", "chatbot")
+  },
+  'organic_vs_recycled': {
+    organic: ['Grown without pesticides', 'GOTS certified', 'Premium quality', 'Environmentally friendly', 'Traceability'],
+    recycled: ['Made from post-consumer waste', 'GRS certified', 'Reduces landfill', 'Lower water usage', 'Cost-effective sustainability'],
+    recommendation: t("Both options are excellent for eco-conscious projects. Organic cotton offers purity, while recycled cotton maximizes resource efficiency.", "chatbot")
+  }
+};
+
+// Generate comparison response
+export const generateComparisonResponse = (item1, item2) => {
+  const comparisonKey = `${item1}_vs_${item2}`;
+  const reverseKey = `${item2}_vs_${item1}`;
+  
+  const comparison = yarnComparisons[comparisonKey] || yarnComparisons[reverseKey];
+  
+  if (comparison) {
+    const keys = Object.keys(comparison).filter(k => k !== 'recommendation');
+    let response = `Here's a comparison:\n\n`;
+    
+    keys.forEach((key, index) => {
+      const displayName = key.replace(/([A-Z])/g, ' $1').trim();
+      response += `**${displayName}:**\n`;
+      comparison[key].forEach(point => {
+        response += `• ${point}\n`;
+      });
+      if (index < keys.length - 1) response += '\n';
+    });
+    
+    response += `\n${comparison.recommendation}`;
+    return response;
+  }
+  
+  return null;
+};
+
+// FAQ database for common questions with quick answers
+export const frequentlyAskedQuestions = {
+  'moq': {
+    question: "What is your minimum order quantity?",
+    answer: t("Our minimum order quantity (MOQ) varies by yarn type:\n• Cotton yarns: 500 kg per count\n• Polyester yarns: 1000 kg per count\n• Specialty yarns: 300 kg per count\n• Samples: Available in smaller quantities\n\nFor smaller orders, please contact us for special arrangements.", "chatbot")
+  },
+  'lead_time': {
+    question: "What is your lead time?",
+    answer: t("Standard lead times:\n• Stock items: 3-5 days\n• Regular orders: 2-3 weeks\n• Custom/bulk orders: 4-6 weeks\n• Custom color development: Add 1-2 weeks\n\nExpress production available for urgent requirements.", "chatbot")
+  },
+  'payment_terms': {
+    question: "What are your payment terms?",
+    answer: t("We offer flexible payment options:\n• New customers: 50% advance, 50% before dispatch\n• Regular customers: LC, TT, or credit terms\n• International: Letter of Credit or advance payment\n• Bulk orders: Negotiable terms available\n\nAll payments secured through verified banking channels.", "chatbot")
+  },
+  'international_shipping': {
+    question: "Do you ship internationally?",
+    answer: t("Yes! We ship worldwide with:\n• FOB/CIF/CFR terms available\n• Export to 40+ countries\n• Door-to-door delivery options\n• All export documentation handled\n• Container loading supervision\n\nMajor export markets: USA, EU, Middle East, and Southeast Asia.", "chatbot")
+  },
+  'quality_guarantee': {
+    question: "Do you offer quality guarantees?",
+    answer: t("Absolutely! Our quality commitment includes:\n• 100% quality inspection before dispatch\n• Uster test reports with every shipment\n• Claims accepted within 30 days\n• Free replacement for genuine quality issues\n• Consistent quality across batches\n\nAll products backed by ISO 9001 quality management.", "chatbot")
+  }
+};
+
+// Match FAQ questions
+export const matchFAQ = (query) => {
+  const lowerQuery = query.toLowerCase();
+  
+  const faqMatches = {
+    'moq': ['minimum order', 'moq', 'min order', 'smallest order', 'minimum quantity', 'how much minimum'],
+    'lead_time': ['lead time', 'how long', 'delivery time', 'production time', 'when can', 'how soon'],
+    'payment_terms': ['payment term', 'payment method', 'how to pay', 'payment option', 'credit', 'advance'],
+    'international_shipping': ['international', 'export', 'ship abroad', 'overseas', 'foreign', 'ship to'],
+    'quality_guarantee': ['guarantee', 'warranty', 'quality assure', 'defect', 'claim', 'replace']
+  };
+  
+  for (const [faqKey, keywords] of Object.entries(faqMatches)) {
+    if (keywords.some(kw => lowerQuery.includes(kw))) {
+      return frequentlyAskedQuestions[faqKey];
+    }
+  }
+  
+  return null;
 };
 
 // Page-specific content from the website
@@ -122,10 +279,10 @@ export const pageContent = {
     ]
   },
   contact: {
-    address: "4-130 Gandhi Nagar, Karur Sukkaliyur, Tamil Nadu, India",
+    address: "124/4 Gandhi Nagar, Sukkaliyur, Karur, Tamil Nadu, India",
     email: "kspyarnskarur@gmail.com",
     phone: "+91 9994955782",
-    hours: "Monday to Saturday: 9 AM to 6 PM IST",
+    hours: "Monday to Friday: 9 AM to 6 PM IST, Saturday: 9 AM to 2 PM IST",
     socialMedia: ["Facebook", "Instagram", "LinkedIn"]
   }
 };
@@ -172,7 +329,7 @@ export const knowledgeBase = {
   },
   'contact': {
     keywords: ['contact', 'email', 'phone', 'call', 'support', 'talk', 'reach', 'service', 'help', 'assistance', 'representative', 'chat'],
-    response: t("You can reach our team at kspyarnskarur@gmail.com or call us at +91 9994955782. Our offices are located at 4-130 Gandhi Nagar, Karur Sukkaliyur. Our customer service team is available Monday to Saturday from 9 AM to 6 PM IST.", "chatbot"),
+    response: t("You can reach our team at kspyarnskarur@gmail.com or call us at +91 9994955782. Our offices are located at 124/4 Gandhi Nagar, Sukkaliyur, Karur. Our customer service team is available Monday to Friday from 9 AM to 6 PM IST and Saturday from 9 AM to 2 PM IST.", "chatbot"),
     followUpQuestions: [
       t("What are your business hours?", "chatbot"),
       t("Do you have a customer support chat?", "chatbot"),
@@ -192,7 +349,7 @@ export const knowledgeBase = {
   'sustainability': {
     keywords: ['eco', 'sustainable', 'environment', 'green', 'recycled', 'planet', 'organic', 'carbon', 'footprint', 'responsible', 'ethical', 'conservation', 'eco-friendly', 'renewable'],
     text: "Sustainability is central to KSP Yarns' operations. Our comprehensive environmental initiatives include: 1) Solar-powered manufacturing facilities reducing carbon emissions, 2) Advanced water recycling and conservation systems achieving 60% water reuse, 3) Zero-waste manufacturing with complete waste recycling and reuse, 4) Sourcing organic and recycled raw materials from certified suppliers, 5) Energy-efficient machinery reducing power consumption by 40%. We hold prestigious certifications: GOTS (Global Organic Textile Standard) for organic products, GRS (Global Recycled Standard) for recycled content verification, ISO 14001 for Environmental Management, and OEKO-TEX Standard 100 for harmful substance testing. Our ambitious sustainability goals include achieving carbon neutrality by 2030, 100% renewable energy usage, zero landfill waste by 2025, and 50% reduction in water consumption by 2028.",
-    response: t("Sustainability is at the core of KSP Yarns' operations:\n\n🌱 Environmental Initiatives:\n• Solar-powered manufacturing facilities\n• 60% water recycling and conservation\n• Zero-waste manufacturing processes\n• Organic and recycled raw materials\n• 40% reduction in energy consumption\n\n🏆 Certifications:\n• GOTS (Global Organic Textile Standard)\n• GRS (Global Recycled Standard)\n• ISO 14001 (Environmental Management)\n• OEKO-TEX Standard 100\n\n🎯 Future Goals:\n• Carbon neutrality by 2030\n• 100% renewable energy usage\n• Zero landfill waste by 2025\n• 50% water consumption reduction by 2028\n\nWe're committed to sustainable textile manufacturing without compromising quality.", "chatbot"),
+    response: t("Sustainability is at the core of KSP Yarns' operations:\n\nEnvironmental Initiatives:\n• Solar-powered manufacturing facilities\n• 60% water recycling and conservation\n• Zero-waste manufacturing processes\n• Organic and recycled raw materials\n• 40% reduction in energy consumption\n\nCertifications:\n• GOTS (Global Organic Textile Standard)\n• GRS (Global Recycled Standard)\n• ISO 14001 (Environmental Management)\n• OEKO-TEX Standard 100\n\nFuture Goals:\n• Carbon neutrality by 2030\n• 100% renewable energy usage\n• Zero landfill waste by 2025\n• 50% water consumption reduction by 2028\n\nWe're committed to sustainable textile manufacturing without compromising quality.", "chatbot"),
     followUpQuestions: [
       t("Tell me about your recycled yarns", "chatbot"),
       t("What is GOTS certification?", "chatbot"),
@@ -244,7 +401,7 @@ export const knowledgeBase = {
   'order_placement': {
     keywords: ['place order', 'place an order', 'buy', 'purchase', 'checkout', 'ordering', 'how to order', 'make order', 'ordering process', 'how can i order', 'how do i place', 'want to buy', 'want to purchase'],
     text: "To place an order with KSP Yarns, you have multiple convenient options: 1) Through our website - Browse our product catalog, select desired yarns with specifications, add to cart, and proceed to secure checkout. 2) Email orders - Send detailed requirements to kspyarnskarur@gmail.com including yarn type, count, quantity, and delivery address. 3) Phone orders - Call +91 9994955782 during business hours (Monday-Saturday, 9 AM-6 PM IST) to speak with our sales team. For bulk or custom orders, our team will provide detailed quotations, discuss specifications, arrange samples if needed, and guide you through the complete ordering process. Minimum order quantities vary by yarn type - please check specific product pages or contact us for MOQ details.",
-    response: t("Placing an order with KSP Yarns is simple and convenient:\n\n📱 Online: Browse our website, select products, and checkout securely\n📧 Email: Send requirements to kspyarnskarur@gmail.com\n☎️ Phone: Call +91 9994955782 (Mon-Sat, 9 AM-6 PM IST)\n\nFor bulk orders:\n• We provide detailed quotations\n• Sample cards available for quality evaluation\n• Custom specifications accepted\n• Flexible payment terms for B2B clients\n\nOur team will guide you through specifications, pricing, and delivery timelines. Minimum order quantities vary by product type.", "chatbot"),
+    response: t("Placing an order with KSP Yarns is simple and convenient:\n\nOnline: Browse our website, select products, and checkout securely\nEmail: Send requirements to kspyarnskarur@gmail.com\nPhone: Call +91 9994955782 (Mon-Fri, 9 AM-6 PM IST; Sat, 9 AM-2 PM IST)\n\nFor bulk orders:\n• We provide detailed quotations\n• Sample cards available for quality evaluation\n• Custom specifications accepted\n• Flexible payment terms for B2B clients\n\nOur team will guide you through specifications, pricing, and delivery timelines. Minimum order quantities vary by product type.", "chatbot"),
     followUpQuestions: [
       t("What payment methods do you accept?", "chatbot"),
       t("What's your minimum order quantity?", "chatbot"),
@@ -265,7 +422,7 @@ export const knowledgeBase = {
   },
   'location': {
     keywords: ['location', 'factory', 'mill', 'office', 'address', 'visit', 'facility', 'headquarter', 'site', 'place', 'direction', 'map'],
-    response: t("Our main facility and office is located at 4-130 Gandhi Nagar, Karur Sukkaliyur, Tamil Nadu, India. We welcome factory visits by appointment. Please contact us at kspyarnskarur@gmail.com to schedule a visit. We also have distribution centers in major textile hubs across India and representative offices in select international locations.", "chatbot")
+    response: t("Our main facility and office is located at 124/4 Gandhi Nagar, Sukkaliyur, Karur, Tamil Nadu, India. We welcome factory visits by appointment. Please contact us at kspyarnskarur@gmail.com to schedule a visit. We also have distribution centers in major textile hubs across India and representative offices in select international locations.", "chatbot")
   },
   'trends': {
     keywords: ['trend', 'fashion', 'popular', 'latest', 'season', 'upcoming', 'modern', 'style', 'design', 'forecast', 'industry'],
@@ -305,8 +462,8 @@ export const knowledgeBase = {
   },
   'quality': {
     keywords: ['quality', 'standard', 'testing', 'check', 'control', 'assurance', 'inspection', 'consistency', 'defect', 'qc', 'qa', 'test'],
-    text: "Quality assurance is paramount at KSP Yarns. We implement a comprehensive multi-stage quality management system with rigorous testing at every production phase. Our quality control includes: 1) Raw material inspection and approval from certified suppliers, 2) In-process quality checks during blowroom, carding, drawing, roving, and spinning stages, 3) Final product testing using advanced Uster technologies for count accuracy (±2%), strength (minimum 85% CSP), elongation (5-8%), evenness (U% <12%), imperfections (IPI values within limits), and hairiness (H value monitoring). We use state-of-the-art testing equipment including Uster Tester 6, Tensorapid strength tester, and advanced moisture analyzers. Our quality team conducts batch consistency checks, color fastness testing (4-5 grade), and comprehensive reporting. We follow international testing standards including ASTM, ISO, and BS methods. Every batch is accompanied by quality certificates and test reports. We maintain 99.5% quality acceptance rate and offer quality guarantees with our products.",
-    response: t("Quality is our top priority at KSP Yarns:\n\n🔬 Testing Standards:\n• Count accuracy: ±2% tolerance\n• Strength: Minimum 85% CSP\n• Evenness: U% <12%\n• Comprehensive IPI testing\n• Color fastness: Grade 4-5\n\n🏭 Quality Control Process:\n• Raw material inspection\n• In-process monitoring at every stage\n• Advanced Uster technology testing\n• Batch consistency verification\n• Final product certification\n\n✅ What We Test:\n• Count, strength, and elongation\n• Evenness and imperfections\n• Hairiness and twist\n• Moisture content\n• Color fastness\n\nWe follow ASTM, ISO, and BS international standards, achieving 99.5% quality acceptance. Every batch includes detailed test reports.", "chatbot"),
+    text: "Quality assurance is paramount at KSP Yarns. We implement a comprehensive multi-stage quality management system with rigorous testing at every production phase. Our quality control includes: 1) Raw material inspection and approval from certified suppliers, 2) In-process quality checks during blowroom, carding, drawing, roving, and spinning stages, 3) Final product testing using advanced Uster technologies for count accuracy (Â±2%), strength (minimum 85% CSP), elongation (5-8%), evenness (U% <12%), imperfections (IPI values within limits), and hairiness (H value monitoring). We use state-of-the-art testing equipment including Uster Tester 6, Tensorapid strength tester, and advanced moisture analyzers. Our quality team conducts batch consistency checks, color fastness testing (4-5 grade), and comprehensive reporting. We follow international testing standards including ASTM, ISO, and BS methods. Every batch is accompanied by quality certificates and test reports. We maintain 99.5% quality acceptance rate and offer quality guarantees with our products.",
+    response: t("Quality is our top priority at KSP Yarns:\n\nðŸ”¬ Testing Standards:\n• Count accuracy: Â±2% tolerance\n• Strength: Minimum 85% CSP\n• Evenness: U% <12%\n• Comprehensive IPI testing\n• Color fastness: Grade 4-5\n\nðŸ­ Quality Control Process:\n• Raw material inspection\n• In-process monitoring at every stage\n• Advanced Uster technology testing\n• Batch consistency verification\n• Final product certification\n\nâœ… What We Test:\n• Count, strength, and elongation\n• Evenness and imperfections\n• Hairiness and twist\n• Moisture content\n• Color fastness\n\nWe follow ASTM, ISO, and BS international standards, achieving 99.5% quality acceptance. Every batch includes detailed test reports.", "chatbot"),
     followUpQuestions: [
       t("What testing equipment do you use?", "chatbot"),
       t("Can you provide quality certificates?", "chatbot"),
@@ -515,14 +672,110 @@ export const knowledgeBase = {
   },
   'contact_details': {
     keywords: ['contact', 'reach', 'email', 'phone', 'call', 'address', 'location', 'office', 'factory', 'headquarters'],
-    text: "Our main facility and office is located at 4-130 Gandhi Nagar, Karur Sukkaliyur, Tamil Nadu, India. You can contact us via email at kspyarnskarur@gmail.com or call us at +91 9994955782. Our business hours are Monday to Saturday from 9 AM to 6 PM IST. We're also active on social media platforms including Facebook, Instagram, and LinkedIn.",
-    response: t("You can reach our team at kspyarnskarur@gmail.com or call us at +91 9994955782. Our offices are located at 4-130 Gandhi Nagar, Karur Sukkaliyur. Our customer service team is available Monday to Saturday from 9 AM to 6 PM IST.", "chatbot"),
+    text: "Our main facility and office is located at 124/4 Gandhi Nagar, Sukkaliyur, Karur, Tamil Nadu, India. You can contact us via email at kspyarnskarur@gmail.com or call us at +91 9994955782. Our business hours are Monday to Friday from 9 AM to 6 PM IST and Saturday from 9 AM to 2 PM IST. We're also active on social media platforms including Facebook, Instagram, and LinkedIn.",
+    response: t("You can reach our team at kspyarnskarur@gmail.com or call us at +91 9994955782. Our office is located at 124/4 Gandhi Nagar, Sukkaliyur, Karur. Our customer service team is available Monday to Friday from 9 AM to 6 PM IST and Saturday from 9 AM to 2 PM IST.", "chatbot"),
     followUpQuestions: [
       t("What are your business hours?", "chatbot"),
       t("Do you have a customer support chat?", "chatbot"),
       t("How can I schedule a meeting?", "chatbot")
     ],
     page: 'contact'
+  },
+  // New enhanced entries for better coverage
+  'moq': {
+    keywords: ['moq', 'minimum order', 'minimum quantity', 'smallest order', 'least order', 'min order', 'small quantity'],
+    text: "Our minimum order quantity varies by yarn type. Cotton yarns typically have an MOQ of 500 kg per count. Polyester yarns have an MOQ of 1000 kg per count. Specialty yarns have a lower MOQ of 300 kg per count. Samples are available in smaller quantities for evaluation purposes.",
+    response: t("Our minimum order quantity (MOQ) varies by yarn type:\n\n• Cotton yarns: 500 kg per count\n• Polyester yarns: 1000 kg per count\n• Specialty yarns: 300 kg per count\n• Samples: Available in smaller quantities\n\nFor smaller quantities or special arrangements, please contact our sales team.", "chatbot"),
+    followUpQuestions: [
+      t("Can I order samples first?", "chatbot"),
+      t("Do you offer bulk discounts?", "chatbot"),
+      t("How do I place an order?", "chatbot")
+    ]
+  },
+  'lead_time': {
+    keywords: ['lead time', 'delivery time', 'how long', 'when ready', 'production time', 'turnaround', 'waiting time', 'how soon'],
+    text: "Standard lead times vary based on order type. Stock items are available within 3-5 days. Regular orders take 2-3 weeks. Custom and bulk orders require 4-6 weeks. Custom color development adds 1-2 weeks to the timeline.",
+    response: t("Our standard lead times are:\n\nâ±ï¸ Stock items: 3-5 business days\nðŸ“¦ Regular orders: 2-3 weeks\nðŸ­ Custom/bulk orders: 4-6 weeks\nðŸŽ¨ Custom colors: Add 1-2 weeks\n\nExpress production is available for urgent requirements at additional cost.", "chatbot"),
+    followUpQuestions: [
+      t("Can you expedite my order?", "chatbot"),
+      t("What items do you have in stock?", "chatbot"),
+      t("How do I track my order?", "chatbot")
+    ]
+  },
+  'bulk_discount': {
+    keywords: ['discount', 'bulk discount', 'volume discount', 'large order', 'wholesale price', 'special price', 'offer', 'deal'],
+    text: "We offer competitive bulk discounts for large orders. Volume discounts typically start at orders of 5 tons and increase with quantity. Regular customers may qualify for annual contracts with preferential pricing. Contact our sales team for custom quotations.",
+    response: t("Yes, we offer attractive bulk discounts! ðŸ’°\n\n• 5+ tons: 3-5% discount\n• 10+ tons: 5-8% discount\n• 25+ tons: 8-12% discount\n• Annual contracts: Custom pricing\n\nRegular customers enjoy additional benefits including priority production and credit terms. Contact us for a personalized quote!", "chatbot"),
+    followUpQuestions: [
+      t("How do I become a regular customer?", "chatbot"),
+      t("What payment terms do you offer?", "chatbot"),
+      t("Can I get a price quote?", "chatbot")
+    ]
+  },
+  'comparison': {
+    keywords: ['difference', 'compare', 'versus', 'vs', 'which is better', 'comparison', 'prefer', 'recommend', 'choose between'],
+    text: "We offer various yarn types each with unique characteristics. Cotton provides comfort and breathability. Polyester offers durability and moisture-wicking. Ring-spun yarn is premium quality with excellent strength. Open-end yarn is cost-effective for bulk production. We can help you choose the right yarn for your specific application.",
+    response: (context) => {
+      if (context && context.lastTopic) {
+        return t("I'd be happy to help you compare yarns! What specific types would you like to compare? For example:\n\n• Cotton vs Polyester\n• Ring-spun vs Open-end\n• Organic vs Recycled\n• Combed vs Carded cotton\n\nTell me which options you're considering and your intended use.", "chatbot");
+      }
+      return t("Great question! Our yarn types have distinct advantages:\n\nðŸŒ¿ Cotton: Natural, breathable, comfortable\nðŸ”· Polyester: Durable, quick-dry, affordable\nðŸŒ€ Blended: Best of both worlds\nâ™»ï¸ Recycled: Eco-friendly, sustainable\n\nWhich types would you like me to compare in detail?", "chatbot");
+    },
+    followUpQuestions: [
+      t("Compare cotton and polyester yarns", "chatbot"),
+      t("What's the difference between ring-spun and open-end?", "chatbot"),
+      t("Which yarn is best for my application?", "chatbot")
+    ]
+  },
+  'international': {
+    keywords: ['international', 'export', 'overseas', 'abroad', 'foreign', 'ship to', 'global', 'worldwide', 'country'],
+    text: "We export to over 40 countries worldwide including the USA, European Union, Middle East, and Southeast Asia. We offer FOB, CIF, and CFR shipping terms. All export documentation and compliance is handled by our experienced team.",
+    response: t("Yes, we ship internationally to 40+ countries.\n\nShipping Terms: FOB, CIF, CFR available\nDocumentation: All export paperwork handled\nMajor Markets: USA, EU, Middle East, Southeast Asia\nDelivery: Door-to-door options available\n\nWe ensure quality packaging for long-distance shipping and provide container loading supervision.", "chatbot"),
+    followUpQuestions: [
+      t("What are your international shipping rates?", "chatbot"),
+      t("Do you handle customs clearance?", "chatbot"),
+      t("What payment terms for international orders?", "chatbot")
+    ]
+  },
+  'working_hours': {
+    keywords: ['hours', 'timing', 'open', 'close', 'working hours', 'business hours', 'available', 'schedule', 'when open'],
+    text: "Our office and customer service are available Monday to Saturday from 9 AM to 6 PM IST (Indian Standard Time). Factory operations run 24/7 with shift schedules. For urgent matters outside business hours, you can email us and we'll respond on the next business day.",
+    response: t("Our business hours are:\n\nOffice Hours: Monday to Friday, 9 AM - 6 PM IST; Saturday, 9 AM - 2 PM IST\nFactory: 24/7 operations\nEmail Support: Always available (response within 24 hours)\nPhone: During office hours\n\nFor urgent matters, email us at kspyarnskarur@gmail.com and we'll prioritize your request.", "chatbot"),
+    followUpQuestions: [
+      t("Can I schedule a factory visit?", "chatbot"),
+      t("How do I reach customer support?", "chatbot"),
+      t("What's your response time for emails?", "chatbot")
+    ]
+  },
+  'packaging': {
+    keywords: ['packaging', 'pack', 'wrap', 'container', 'box', 'cone', 'bobbin', 'bag', 'carton'],
+    text: "We offer various packaging options including standard cones, paper cones, plastic cones, and customized packaging. Standard packaging includes PP bags and corrugated cartons. Palletization is available for container shipments. Custom labeling and branding options available for regular customers.",
+    response: t("We offer flexible packaging options:\n\nðŸ“¦ Cone Types: Paper cones, plastic cones, dyeing tubes\nðŸŽ Packaging: PP bags, corrugated cartons\nðŸ“ Palletization: Available for container loads\nðŸ·ï¸ Labeling: Custom labels and branding available\n\nPackaging is designed for safe transit and easy handling. Let us know your preferences!", "chatbot"),
+    followUpQuestions: [
+      t("What cone sizes are available?", "chatbot"),
+      t("Can you provide custom packaging?", "chatbot"),
+      t("What is your packing list format?", "chatbot")
+    ]
+  },
+  'testing_reports': {
+    keywords: ['test report', 'lab report', 'quality report', 'uster', 'certificate', 'coa', 'coc', 'documentation'],
+    text: "We provide comprehensive quality documentation including Uster test reports, strength test results, count certificates, and compliance certificates. All reports follow international testing standards. GOTS and GRS transaction certificates available for certified products.",
+    response: t("We provide complete quality documentation:\n\nðŸ“‹ Test Reports:\n• Uster evenness reports\n• Strength and elongation\n• Count verification\n• Twist test results\n\nðŸ“œ Certificates:\n• Certificate of Analysis (COA)\n• Certificate of Conformity\n• GOTS/GRS Transaction Certificates\n• Mill test reports\n\nAll documentation provided with shipment. Additional tests available on request.", "chatbot"),
+    followUpQuestions: [
+      t("Can you send sample test reports?", "chatbot"),
+      t("What testing equipment do you use?", "chatbot"),
+      t("Do you follow international testing standards?", "chatbot")
+    ]
+  },
+  'factory_visit': {
+    keywords: ['visit', 'tour', 'see factory', 'come to', 'meet', 'in person', 'facility tour', 'show around'],
+    text: "We welcome factory visits by appointment. Visitors can see our manufacturing process, quality control labs, and meet our team. Please schedule at least one week in advance. We can arrange pickup from Karur railway station or nearby airports.",
+    response: t("We welcome factory visits! ðŸ­\n\nðŸ“ Location: Karur, Tamil Nadu, India\nðŸ“… Scheduling: At least 1 week advance notice\nðŸš— Transport: Pickup from Karur station available\n\nDuring your visit, you can:\n• Tour our manufacturing facility\n• See quality control processes\n• Meet our technical team\n• Discuss custom requirements\n\nTo schedule, email kspyarnskarur@gmail.com with your preferred dates.", "chatbot"),
+    followUpQuestions: [
+      t("How do I schedule a factory visit?", "chatbot"),
+      t("What's the nearest airport to your factory?", "chatbot"),
+      t("Can you arrange hotel accommodation?", "chatbot")
+    ]
   }
 };
 
@@ -553,3 +806,5 @@ function getTimeOfDay() {
   if (hour < 18) return t("Good afternoon", "chatbot");
   return t("Good evening", "chatbot");
 }
+
+

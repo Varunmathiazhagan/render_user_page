@@ -12,9 +12,11 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
 } from "react-icons/fa";
+import { useTranslation } from "../utils/TranslationContext";
 
 const Signup = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -81,11 +83,11 @@ const Signup = ({ setIsAuthenticated }) => {
 
   const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("Passwords do not match", "signup"));
       return false;
     }
     if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters long");
+      setError(t("Password must be at least 8 characters long", "signup"));
       return false;
     }
     return true;
@@ -121,7 +123,7 @@ const Signup = ({ setIsAuthenticated }) => {
       }
     } catch (err) {
       console.error("Signup error:", err);
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      setError(err.response?.data?.message || t("Registration failed. Please try again.", "signup"));
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +172,7 @@ const Signup = ({ setIsAuthenticated }) => {
 
   const handleGoogleError = () => {
     console.error("Google login failed");
-    setError("Google login failed. Please try again.");
+    setError(t("Google login failed. Please try again.", "signup"));
   };
 
   return (
@@ -195,10 +197,10 @@ const Signup = ({ setIsAuthenticated }) => {
                   variants={itemVariants}
                   className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600"
                 >
-                  Create an Account
+                  {t('Create Account', 'signup')}
                 </motion.h2>
                 <motion.p variants={itemVariants} className="text-gray-500 mt-2">
-                  Join us to explore our premium yarn collections
+                  {t('Sign up to get started', 'signup')}
                 </motion.p>
               </motion.div>
 
@@ -222,7 +224,7 @@ const Signup = ({ setIsAuthenticated }) => {
               >
                 <motion.div variants={itemVariants}>
                   <label className="block text-gray-700 text-sm font-medium mb-1">
-                    Full Name
+                    {t('Full Name', 'signup')}
                   </label>
                   <div
                     className={`relative rounded-lg transition-all duration-200 ${
@@ -241,14 +243,14 @@ const Signup = ({ setIsAuthenticated }) => {
                       onBlur={() => setFocusedInput(null)}
                       required
                       className="block w-full bg-gray-50 pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="John Doe"
+                      placeholder={t('John Doe', 'signup')}
                     />
                   </div>
                 </motion.div>
 
                 <motion.div variants={itemVariants}>
                   <label className="block text-gray-700 text-sm font-medium mb-1">
-                    Email Address
+                    {t('Email Address', 'signup')}
                   </label>
                   <div
                     className={`relative rounded-lg transition-all duration-200 ${
@@ -267,14 +269,14 @@ const Signup = ({ setIsAuthenticated }) => {
                       onBlur={() => setFocusedInput(null)}
                       required
                       className="block w-full bg-gray-50 pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="you@example.com"
+                      placeholder={t('you@example.com', 'signup')}
                     />
                   </div>
                 </motion.div>
 
                 <motion.div variants={itemVariants}>
                   <label className="block text-gray-700 text-sm font-medium mb-1">
-                    Password
+                    {t('Password', 'signup')}
                   </label>
                   <div
                     className={`relative rounded-lg transition-all duration-200 ${
@@ -355,7 +357,7 @@ const Signup = ({ setIsAuthenticated }) => {
                     ) : (
                       <FaUserPlus className="mr-2" />
                     )}
-                    {isLoading ? "Creating account..." : "Create Account"}
+                    {isLoading ? t('Signing up...', 'signup') : t('Sign Up', 'signup')}
                   </motion.button>
                 </motion.div>
 
@@ -364,7 +366,7 @@ const Signup = ({ setIsAuthenticated }) => {
                     <div className="w-full border-t border-gray-300"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    <span className="px-2 bg-white text-gray-500">{t('Or continue with', 'signup')}</span>
                   </div>
                 </motion.div>
 
@@ -392,9 +394,9 @@ const Signup = ({ setIsAuthenticated }) => {
 
               <motion.div variants={itemVariants} className="text-center mt-8 text-gray-600">
                 <p>
-                  Already have an account?{" "}
+                  {t("Already have an account?", 'signup')}{" "}
                   <Link to="/login" className="text-blue-600 font-medium hover:text-blue-800">
-                    Log In
+                    {t('Sign In', 'signup')}
                   </Link>
                 </p>
               </motion.div>

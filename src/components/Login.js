@@ -10,9 +10,11 @@ import {
   FaSpinner,
   FaExclamationTriangle,
 } from "react-icons/fa";
+import { useTranslation } from "../utils/TranslationContext";
 
 const Login = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -113,7 +115,7 @@ const Login = ({ setIsAuthenticated }) => {
 
   const handleGoogleError = () => {
     console.error("Google login failed");
-    setError("Google login failed. Please try again.");
+    setError(t("Google login failed. Please try again.", "login"));
   };
 
   return (
@@ -138,10 +140,10 @@ const Login = ({ setIsAuthenticated }) => {
                   variants={itemVariants}
                   className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600"
                 >
-                  Welcome Back
+                  {t('Welcome Back', 'login')}
                 </motion.h2>
                 <motion.p variants={itemVariants} className="text-gray-500 mt-2">
-                  Log in to your account to continue
+                  {t('Log in to your account to continue', 'login')}
                 </motion.p>
               </motion.div>
 
@@ -165,7 +167,7 @@ const Login = ({ setIsAuthenticated }) => {
               >
                 <motion.div variants={itemVariants}>
                   <label className="block text-gray-700 text-sm font-medium mb-1">
-                    Email Address
+                    {t('Email Address', 'login')}
                   </label>
                   <div
                     className={`relative rounded-lg transition-all duration-200 ${
@@ -184,7 +186,7 @@ const Login = ({ setIsAuthenticated }) => {
                       onBlur={() => setFocusedInput(null)}
                       required
                       className="block w-full bg-gray-50 pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="you@example.com"
+                      placeholder={t("you@example.com", "login")}
                     />
                   </div>
                 </motion.div>
@@ -192,10 +194,10 @@ const Login = ({ setIsAuthenticated }) => {
                 <motion.div variants={itemVariants}>
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-gray-700 text-sm font-medium">
-                      Password
+                      {t('Password', 'login')}
                     </label>
                     <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
-                      Forgot password?
+                      {t('Forgot password?', 'login')}
                     </Link>
                   </div>
                   <div
@@ -233,7 +235,7 @@ const Login = ({ setIsAuthenticated }) => {
                     ) : (
                       <FaSignInAlt className="mr-2" />
                     )}
-                    {isLoading ? "Signing in..." : "Sign In"}
+                    {isLoading ? t('Signing in...', 'login') : t('Sign In', 'login')}
                   </motion.button>
                 </motion.div>
 
@@ -242,7 +244,7 @@ const Login = ({ setIsAuthenticated }) => {
                     <div className="w-full border-t border-gray-300"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    <span className="px-2 bg-white text-gray-500">{t('Or continue with', 'login')}</span>
                   </div>
                 </motion.div>
 
@@ -267,9 +269,9 @@ const Login = ({ setIsAuthenticated }) => {
 
               <motion.div variants={itemVariants} className="text-center mt-8 text-gray-600">
                 <p>
-                  Don't have an account?{" "}
+                  {t("Don't have an account?", 'login')}{" "}
                   <Link to="/signup" className="text-blue-600 font-medium hover:text-blue-800">
-                    Sign Up
+                    {t('Sign Up', 'login')}
                   </Link>
                 </p>
               </motion.div>

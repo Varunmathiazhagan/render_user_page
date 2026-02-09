@@ -346,6 +346,36 @@ const RecommendationsPage = () => {
     return x - Math.floor(x);
   };
 
+  // Parse price range strings like "₹120-140/kg" -> { min: 120, max: 140 }
+  const parsePriceRange = (range) => {
+    if (!range) return null;
+    const match = range.match(/(\d+)[^\d]+(\d+)/);
+    if (!match) return null;
+    return { min: Number(match[1]), max: Number(match[2]) };
+  };
+
+  // Basic preference matching to avoid irrelevant picks
+  const matchesPreferences = (item, prefs) => {
+    // Count match: check if selected count substring appears in the name
+    if (prefs.count && !item.name.toLowerCase().includes(prefs.count.toLowerCase())) {
+      return false;
+    }
+
+    // Price range match
+    const parsedRange = parsePriceRange(prefs.priceRange);
+    if (parsedRange) {
+      if (item.price < parsedRange.min || item.price > parsedRange.max) return false;
+    }
+
+    // Rating threshold match
+    if (prefs.rating) {
+      const ratingThreshold = parseFloat(String(prefs.rating).replace(/[^0-9.]/g, '')) || 0;
+      if (item.rating < ratingThreshold) return false;
+    }
+
+    return true;
+  };
+
   const generateCreativeRecommendations = async () => {
     setLoading(true);
     setError(null);
@@ -383,11 +413,10 @@ const RecommendationsPage = () => {
       let filteredRecommendations = productsShuffled
         .filter(item => {
           // Base stock check with creative factor
-          const stockCheck = creativity > 0.7 ? 
-            true : // Ignore stock at high creativity
-            item.stock > 0;
-          
-          return stockCheck;
+          const stockCheck = creativity > 0.7 ? true : item.stock > 0;
+          if (!stockCheck) return false;
+          // Preference relevance check
+          return matchesPreferences(item, userPreferences);
         })
         .map(item => {
           // Apply creativity to item properties
@@ -418,14 +447,14 @@ const RecommendationsPage = () => {
         .slice(0, Math.max(3, Math.floor(3 + creativity * 4))); // More results at higher creativity
 
       if (filteredRecommendations.length === 0) {
-        setError("No products found with your criteria. Try increasing the creativity level!");
+        setError(t("No products found with your criteria. Try increasing the creativity level!", "recommendations"));
         setRecommendations([]);
       } else {
         setCurrentPage(0);
         setRecommendations(filteredRecommendations);
       }
     } catch (err) {
-      setError("Failed to generate creative recommendations. Please try again.");
+      setError(t("Failed to generate creative recommendations. Please try again.", "recommendations"));
     } finally {
       setLoading(false);
     }
@@ -522,8 +551,10 @@ const RecommendationsPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!userPreferences.color && !userPreferences.count && !userPreferences.priceRange) {
-      setError("Please select at least one filter criterion");
+    const { purpose, priceRange, quantity, count, blend, rating } = userPreferences;
+    const hasAnyFilter = [purpose, priceRange, quantity, count, blend, rating].some(Boolean);
+    if (!hasAnyFilter) {
+      setError(t("Please select at least one filter criterion", "recommendations"));
       return;
     }
     generateCreativeRecommendations();
@@ -843,6 +874,9 @@ const RecommendationsPage = () => {
                             <p className="text-gray-600 text-sm">{item.reason}</p>
                             <div className="flex items-center justify-between mt-2">
                               <p className="text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 font-semibold">₹{item.displayPrice}</p>
+                              <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                                {item.stock > 60 ? t('In stock', 'recommendations') : item.stock > 0 ? t('Limited', 'recommendations') : t('Backorder', 'recommendations')}
+                              </span>
                               {item.displayPrice !== item.originalPrice && parseFloat(userPreferences.creativeFactor || 0.5) > 0.6 && (
                                 <span className="text-xs px-2 py-1 rounded-full bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border border-amber-200">
                                   {item.displayPrice > item.originalPrice ? t('Premium selection', 'recommendations') : t('Special offer', 'recommendations')}
