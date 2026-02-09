@@ -27,19 +27,31 @@ const JWT_EXPIRATION = "1d"; // 1 day
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: [
-    'https://ksp-gamma.vercel.app',
-    'https://kspyarnsadmin.vercel.app',
-    'http://localhost:5173',
-    'https://ksp.varunm.tech',
-    'https://kspadmin.varunm.tech', // Added new allowed origin
-    '*'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+const allowedOrigins = new Set([
+  "https://ksp-gamma.vercel.app",
+  "https://kspyarnsadmin.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ksp.varunm.tech",
+  "https://kspadmin.varunm.tech",
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser/server-to-server requests and known browser origins.
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Initialize Google OAuth client outside any route
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
