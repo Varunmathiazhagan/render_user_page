@@ -48,7 +48,6 @@ const Login = ({ setIsAuthenticated }) => {
         password: formData.password,
       };
 
-      console.log("Attempting login with:", loginData.email);
       const response = await axios.post("https://render-user-page.onrender.com/login", loginData);
 
       if (response.data && response.data.token) {
@@ -80,7 +79,6 @@ const Login = ({ setIsAuthenticated }) => {
         throw new Error("No credential received from Google.");
       }
 
-      console.log("Google credential received, sending to backend for sign in...");
       const response = await axios.post(
         "https://render-user-page.onrender.com/oauth/google",
         { 
@@ -90,10 +88,12 @@ const Login = ({ setIsAuthenticated }) => {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log("Backend response:", response.data);
       if (response.data && response.data.token) {
+        const tokenExpiry = new Date();
+        tokenExpiry.setDate(tokenExpiry.getDate() + 1);
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("tokenExpiry", tokenExpiry.toISOString());
         setIsAuthenticated(true);
         navigate("/");
       } else {

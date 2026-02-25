@@ -128,13 +128,12 @@ export const calculateSimilarity = (textA, textB) => {
 // Find the best match in a set of documents for a query
 export const findBestMatch = (query, documents, threshold = 0.2) => {
   if (!query || !documents || documents.length === 0) return null;
-  
-  const processedQuery = preprocessText(query);
-  
+
   // Calculate similarity scores for each document
   const scores = documents.map(doc => ({
     document: doc,
-    similarity: calculateSimilarity(processedQuery, doc.text || doc.keywords?.join(' ') || '')
+    // calculateSimilarity handles preprocessing internally and expects text input
+    similarity: calculateSimilarity(query, doc.text || doc.keywords?.join(' ') || '')
   }));
   
   // Sort by similarity score (descending)

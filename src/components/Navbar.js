@@ -153,6 +153,7 @@ const Navbar = memo(({ cart, theme = 'light', isAuthenticated, setIsAuthenticate
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tokenExpiry');
     setIsAuthenticated(false);
     navigate('/');
   };

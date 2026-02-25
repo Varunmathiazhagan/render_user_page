@@ -188,13 +188,10 @@ const UserProfile = () => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error("Authentication token not found");
 
-      console.log("Fetching orders with token:", token);
       const response = await axios.get(`${API_URL}/api/my-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      console.log("Orders response:", response.data);
-      
       // Handle the new response format
       const ordersData = response.data.orders || response.data;
       
@@ -212,7 +209,6 @@ const UserProfile = () => {
         paymentStatus: order.paymentStatus || 'pending'
       })) : [];
 
-      console.log(`Formatted ${formattedOrders.length} orders`);
       setOrders(formattedOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);

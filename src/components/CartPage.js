@@ -20,6 +20,7 @@ import { useState, useEffect } from "react";
 import Payment from "./Payment"; // Import the new Payment component
 import { jsPDF } from "jspdf";
 import "jspdf-autotable"; // Add this import for table support in PDF
+import { sanitizeInput } from "../utils/sanitize";
 import { FileText } from "lucide-react"; // or use another file icon
 
 const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => {
@@ -38,6 +39,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   const currentStepIndex = steps.indexOf(step);
 
   const [savedOrder, setSavedOrder] = useState(null);
+  const [savedOrderItems, setSavedOrderItems] = useState([]); // Preserve cart items for confirmation
   // Using setOrderProcessingError in new handleSuccessfulPayment function
   const [orderProcessingError, setOrderProcessingError] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
@@ -47,6 +49,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   const [isMobile, setIsMobile] = useState(false);
   const [orderReference, setOrderReference] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("razorpay"); // Add missing state
+  const [savedTotalPrice, setSavedTotalPrice] = useState(0); // Preserve total for confirmation
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Handle Back Button Click
@@ -83,8 +86,14 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   const handleSuccessfulPayment = (order, method) => {
     setSavedOrder(order);
     setPaymentMethod(method); // Store the payment method
+    setSavedOrderItems([...cart]); // Preserve cart items for confirmation/invoice
+    setSavedTotalPrice(totalPrice); // Preserve total for confirmation/invoice
     if (!order) {
       setOrderProcessingError("Order was processed but could not be saved. Please contact support with your reference number.");
+    }
+    // Clear the cart after successful order
+    if (typeof setCart === 'function') {
+      setCart([]);
     }
     setStep("confirmation");
   };
@@ -168,7 +177,16 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
   // Updated handleShippingInfoSubmit - no need to validate email since we use the user's email
   const handleShippingInfoSubmit = (e) => {
     e.preventDefault();
-    const { fullName, addressLine1, city, postalCode, phone } = shippingInfo;
+    // Sanitize all shipping fields before validation
+    const sanitized = {
+      fullName: sanitizeInput(shippingInfo.fullName),
+      addressLine1: sanitizeInput(shippingInfo.addressLine1),
+      city: sanitizeInput(shippingInfo.city),
+      postalCode: sanitizeInput(shippingInfo.postalCode),
+      phone: sanitizeInput(shippingInfo.phone),
+    };
+    setShippingInfo(prev => ({ ...prev, ...sanitized }));
+    const { fullName, addressLine1, city, postalCode, phone } = sanitized;
 
     // Basic validation for required fields
     if (!fullName || !addressLine1 || !city || !postalCode || !phone) {
@@ -740,7 +758,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
         doc.autoTable({
           startY: 90,
           head: [["Item", "Quantity", "Price", "Total"]],
-          body: cart.map(item => [
+          body: savedOrderItems.map(item => [
             item.name,
             item.quantity.toString(),
             `₹${item.price.toFixed(2)}`,
@@ -782,7 +800,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
         // Add summary items
         doc.setFont("helvetica", "normal");
         doc.text("Subtotal:", summaryX, currentY);
-        doc.text(`₹${totalPrice.toFixed(2)}`, summaryX + summaryWidth, currentY, { align: "right" });
+        doc.text(`₹${savedTotalPrice.toFixed(2)}`, summaryX + summaryWidth, currentY, { align: "right" });
         currentY += 7;
         
         doc.text("Delivery:", summaryX, currentY);
@@ -793,7 +811,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(12);
         doc.text("Total:", summaryX, currentY);
-        doc.text(`₹${(totalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)}`, summaryX + summaryWidth, currentY, { align: "right" });
+        doc.text(`₹${(savedTotalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)}`, summaryX + summaryWidth, currentY, { align: "right" });
         
         // Footer
         const pageHeight = doc.internal.pageSize.height;
@@ -858,7 +876,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
           </p>
           <p className="text-sm mt-2 text-gray-600">
             {paymentMethod === "cod"
-              ? `You will pay ₹${(totalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)} when your order arrives.`
+              ? `You will pay ₹${(savedTotalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)} when your order arrives.`
               : "Payment has been completed successfully."}
           </p>
         </motion.div>
@@ -881,7 +899,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
           <div className="bg-white p-4 rounded-md shadow-sm">
             <h4 className="text-sm uppercase text-gray-500 mb-2">Items</h4>
             <div className="max-h-40 overflow-y-auto pr-2">
-              {cart.map((item) => (
+              {savedOrderItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div className="flex items-center space-x-3">
                     {item.image && (
@@ -926,7 +944,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
             <div className="space-y-1">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
-                <span>₹{totalPrice.toFixed(2)}</span>
+                <span>₹{savedTotalPrice.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Delivery</span>
@@ -950,7 +968,7 @@ const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => 
               </div>
               <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-gray-200">
                 <span>Total</span>
-                <span className="text-blue-600">₹{(totalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)}</span>
+                <span className="text-blue-600">₹{(savedTotalPrice + (deliveryMethod === "express" ? 100 : 0)).toFixed(2)}</span>
               </div>
             </div>
           </div>

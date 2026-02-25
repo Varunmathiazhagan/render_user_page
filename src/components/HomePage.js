@@ -1,21 +1,11 @@
 "use client"
+import { useEffect, useState } from "react"
 import { motion, useScroll } from "framer-motion"
 import { Link } from "react-router-dom" // Add this import
 import { FaLeaf, FaRecycle, FaIndustry, FaChevronDown, FaQuoteLeft, FaImages, FaTshirt, FaCar, FaHospital, FaHome, FaCheckCircle, FaTools, FaMicroscope, FaAward, FaClipboardCheck } from "react-icons/fa"
 import { useInView } from "react-intersection-observer"
 import { useTranslation } from "../utils/TranslationContext" // Import the translation hook
-
-// Add ScrollProgressBar component
-const ScrollProgressBar = () => {
-  const { scrollYProgress } = useScroll()
-  
-  return (
-    <motion.div
-      className="fixed top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-800 origin-left z-50"
-      style={{ scaleX: scrollYProgress }}
-    />
-  )
-}
+import ScrollProgressBar from "./ScrollProgressBar"
 
 // VideoBackground Component
 const VideoBackground = () => {
@@ -365,33 +355,45 @@ const SparkleEffect = () => {
 // New Product Showcase Section with image gallery
 const ProductShowcaseSection = () => {
   const { t } = useTranslation() // Add translation hook
+  const [products, setProducts] = useState([])
   const [ref, inView] = useInView({
     triggerOnce: false, // Changed to false to restart animation when revisiting
     threshold: 0.1,
   })
 
-  const products = [
-    { 
-      name: t("Recycled Polyester Yarn", "home"), 
-      image: "/images/rc.jpeg", 
-      description: t("Eco-friendly yarn made from recycled plastic bottles", "home")
-    },
-    { 
-      name: t("Organic Cotton Yarn", "home"), 
-      image: "/images/co.jpeg", 
-      description: t("100% organic cotton, sustainably harvested and processed", "home")
-    },
-    { 
-      name: t("Ring Spun Yarn", "home"), 
-      image: "/images/rs.jpeg", 
-      description: t("Premium quality for high-performance textiles", "home")
-    },
-    { 
-      name: t("Vortex Yarn", "home"), 
-      image: "/images/v.jpeg", 
-      description: t("Advanced technology for superior strength and comfort", "home")
+  useEffect(() => {
+    let mounted = true
+
+    const fetchShowcaseProducts = async () => {
+      try {
+        const response = await fetch("https://render-user-page.onrender.com/api/products")
+        if (!response.ok) {
+          throw new Error("Failed to fetch products")
+        }
+        const data = await response.json()
+        if (!mounted) return
+
+        const mapped = (Array.isArray(data) ? data : [])
+          .slice(0, 4)
+          .map((item) => ({
+            id: item.id || item._id,
+            name: item.name || t("Premium Yarn", "home"),
+            image: item.image || "/images/default_yarn.jpg",
+            description: item.description || t("High-quality yarn from our latest inventory", "home"),
+          }))
+
+        setProducts(mapped)
+      } catch (error) {
+        if (!mounted) return
+        setProducts([])
+      }
     }
-  ]
+
+    fetchShowcaseProducts()
+    return () => {
+      mounted = false
+    }
+  }, [t])
 
   return (
     <motion.section
@@ -423,7 +425,7 @@ const ProductShowcaseSection = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative" style={{ zIndex: 1 }}>
         {products.map((product, index) => (
           <motion.div
-            key={`product-${index}`}
+            key={`product-${product.id || index}`}
             className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group"
             initial={{ opacity: 0, y: 30 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -754,7 +756,7 @@ const QualityAssuranceSection = () => {
 const HomePage = () => {
   return (
     <div className="relative">
-      <ScrollProgressBar />
+      <ScrollProgressBar gradient="from-blue-400 via-blue-600 to-blue-800" />
       <VideoBackground />
       <div className="space-y-16 bg-gradient-to-b from-white via-blue-50 to-gray-50">
         <FeaturesSection />

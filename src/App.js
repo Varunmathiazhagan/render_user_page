@@ -1,21 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { motion, useScroll, useSpring } from "framer-motion";
 import Navbar from "./components/Navbar";
-import Home from "./components/HomePage";
-import Products from "./components/ProductPage";
-import Recommendations from "./components/RecommendationsPage";
-import About from "./components/AboutPage";
-import Contact from "./components/ContactPage";
-import Cart from "./components/CartPage";
 import Footer from "./components/Footer";
-import Login from "./components/Login";
-import Signup from "./components/Signup";
-import UserProfile from "./components/UserProfile";
-import ChatBot from "./components/ChatBot"; 
-import ScrollToTop from "./components/ScrollToTop"; // Import the new component
+import ScrollToTop from "./components/ScrollToTop";
 import { TranslationProvider } from './utils/TranslationContext';
 import './App.css';
+
+// Lazy-loaded routes for code splitting & faster initial load
+const Home = lazy(() => import("./components/HomePage"));
+const Products = lazy(() => import("./components/ProductPage"));
+const Recommendations = lazy(() => import("./components/RecommendationsPage"));
+const About = lazy(() => import("./components/AboutPage"));
+const Contact = lazy(() => import("./components/ContactPage"));
+const Cart = lazy(() => import("./components/CartPage"));
+const Login = lazy(() => import("./components/Login"));
+const Signup = lazy(() => import("./components/Signup"));
+const UserProfile = lazy(() => import("./components/UserProfile"));
+const ChatBot = lazy(() => import("./components/ChatBot"));
+
+// Lightweight loading fallback
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
+);
 
 // Add ScrollProgress component
 const ScrollProgress = () => {
@@ -115,9 +124,10 @@ const App = () => {
         <ScrollToTop /> {/* Add ScrollToTop component here */}
         <Navbar cart={cart} isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
         <div className="flex-grow pt-16 pb-20">
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Home />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/products" element={<Products addToCart={addToCart} isAuthenticated={isAuthenticated} />} />
             <Route path="/recommendations" element={<Recommendations />} />
@@ -158,11 +168,14 @@ const App = () => {
               }
             />
           </Routes>
+          </Suspense>
         </div>
         <Footer />
         
         {/* Add ChatBot component so it appears on all pages */}
-        <ChatBot />
+        <Suspense fallback={null}>
+          <ChatBot />
+        </Suspense>
       </div>
     </TranslationProvider>
   );

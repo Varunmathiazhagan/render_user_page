@@ -62,11 +62,7 @@ const Payment = ({
       userEmail,
       orderItems: cart.map((item) => {
         // Ensure productId is properly passed
-        // If item.id exists and productId doesn't, use id as productId
         const productId = item.productId || item.id || null;
-        
-        // Log what we're sending to help with debugging
-        console.log(`Product in cart: ${item.name}, ID: ${productId}, Type: ${typeof productId}`);
         
         return {
           productId,
@@ -85,11 +81,9 @@ const Payment = ({
       subtotal: totalPrice,
       deliveryPrice: deliveryMethod === "express" ? 100 : 0,
       totalPrice: totalPrice + (deliveryMethod === "express" ? 100 : 0),
-      orderReference: `ORD-${Math.floor(Math.random() * 1000000)}`,
+      orderReference: `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
       notes: "",
     };
-
-    console.log("Order data:", JSON.stringify(orderData, null, 2));
 
     // For Cash on Delivery
     if (paymentMethod === "cod") {

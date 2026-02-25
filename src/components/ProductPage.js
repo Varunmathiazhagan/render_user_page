@@ -1,87 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown } from "react-icons/fa";
-import { motion, AnimatePresence, useAnimation, useScroll } from "framer-motion";
+import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import useProducts from "../hooks/useProducts";
 import { fallbackImageBase64 } from '../assets/fallback';
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
-
-const ScrollProgressBar = () => {
-  const { scrollYProgress } = useScroll()
-  
-  return (
-    <motion.div
-      className="fixed top-0 left-0 right-0 h-2 bg-gradient-to-r from-teal-500 via-blue-600 to-purple-600 origin-left z-50"
-      style={{ scaleX: scrollYProgress }}
-    />
-  )
-}
+import ScrollProgressBar from "./ScrollProgressBar";
+import { colorMap, getColorHex } from "../utils/colorMap";
 
 const ColorPalette = ({ availableColors, selectedColors, toggleColor }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Common yarn colors with their hex values
-  const colorMap = {
-    'Red': '#FF0000',
-    'Blue': '#0000FF',
-    'Green': '#008000',
-    'Yellow': '#FFFF00',
-    'Purple': '#800080',
-    'Pink': '#FFC0CB',
-    'Orange': '#FFA500',
-    'Brown': '#A52A2A',
-    'Black': '#000000',
-    'White': '#FFFFFF',
-    'Gray': '#808080',
-    'Beige': '#F5F5DC',
-    'Teal': '#008080',
-    'Navy': '#000080',
-    'Navy Blue': '#000080',
-    'Sky Blue': '#87CEEB',
-    'Dark Green': '#006400',
-    'Light Pink': '#FFB6C1',
-    'Dark Milange': '#666666',
-    'Light Milange': '#AAAAAA',
-    'Steel Grey': '#71797E',
-    'Maroon': '#800000',
-    'Rose': '#FF007F',
-    'Lavander': '#E6E6FA',
-    'Majentha': '#FF00FF',
-    'Nut Brown': '#5C4033',
-    'Onion': '#CC7722',
-    'Violet': '#8F00FF',
-    'Water Green': '#73C2FB',
-    'Peacock Green': '#00A693',
-    'F Green': '#009E60',
-    'T Blue': '#0087BD',
-    'Baby Pink': '#F4C2C2',
-    'L Rose': '#E8909C',
-    'kavee': '#A0522D',
-    'p Green': '#98FB98',
-    'Water Blue': '#AEC6CF',
-    'G Yellow': '#FFD700',
-    'L Yellow': '#FFFFE0',
-    'F Orange': '#FF5F1F',
-    'C Orange': '#FF7F50',
-    'H White': '#F8F8FF',
-    'R Green': '#009900',
-  };
-
-  // Map color names to their hex values
-  const getColorHex = (colorName) => {
-    if (!colorName) return '#CCCCCC';
-    
-    // Try direct mapping first
-    if (colorMap[colorName]) return colorMap[colorName];
-    
-    // Try case-insensitive search
-    const lowerColorName = colorName.toLowerCase();
-    const colorKey = Object.keys(colorMap).find(key => 
-      key.toLowerCase() === lowerColorName
-    );
-    
-    return colorKey ? colorMap[colorKey] : '#CCCCCC'; // Default gray if not found
-  };
 
   // Create a preview of colors for the collapsed chart
   const colorPreview = availableColors.slice(0, 5).map(color => (
@@ -290,6 +218,17 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Debounced search
+  const [displaySearch, setDisplaySearch] = useState(searchTerm);
+  const debounceRef = useRef(null);
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setDisplaySearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearchTerm(value), 300);
+  }, [setSearchTerm]);
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
   useEffect(() => {
     if (selectedProduct) {
       controls.start("visible");
@@ -386,7 +325,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
       const token = localStorage.getItem('token');
       if (!token) throw new Error("Authentication token not found");
 
-      const productId = product.id;
+      const productId = String(product.id);
       
       if (wishlistItems.has(productId)) {
         // Remove from wishlist
@@ -488,7 +427,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
         >
           {wishlistLoading ? (
             <FaSpinner className="text-gray-400 text-xl animate-spin" />
-          ) : wishlistItems.has(product.id) ? (
+          ) : wishlistItems.has(String(product.id)) ? (
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }}>
               <FaHeart className="text-red-500 text-xl" />
             </motion.div>
@@ -547,7 +486,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
           {[...Array(5)].map((_, i) => (
             <FaStar key={i} className={i < (product.rating || 4) ? "text-yellow-400" : "text-gray-300"} />
           ))}
-          <span className="text-xs text-gray-500 ml-2">({product.reviews || Math.floor(Math.random() * 100) + 5} reviews)</span>
+          <span className="text-xs text-gray-500 ml-2">({product.reviews || 0} reviews)</span>
         </div>
 
         <h2 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text group-hover:scale-105 transition-transform">
@@ -602,50 +541,6 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
     </motion.div>
   );
 
-  // Helper function to get color hex values - same as in ColorPalette component
-  const getColorHex = (colorName) => {
-    if (!colorName) return '#CCCCCC';
-    
-    const colorMap = {
-      'Red': '#FF0000',
-      'Blue': '#0000FF',
-      'Green': '#008000',
-      'Yellow': '#FFFF00',
-      'Purple': '#800080',
-      'Pink': '#FFC0CB',
-      'Orange': '#FFA500',
-      'Brown': '#A52A2A',
-      'Black': '#000000',
-      'White': '#FFFFFF',
-      'Gray': '#808080',
-      'Beige': '#F5F5DC',
-      'Teal': '#008080',
-      'Navy': '#000080',
-      'Navy Blue': '#000080',
-      'Sky Blue': '#87CEEB',
-      'Dark Green': '#006400',
-      'Light Pink': '#FFB6C1',
-      'Dark Milange': '#666666',
-      'Light Milange': '#AAAAAA',
-      'Steel Grey': '#71797E',
-      'Maroon': '#800000',
-      'Rose': '#FF007F',
-      'Lavander': '#E6E6FA',
-      'Majentha': '#FF00FF',
-    };
-    
-    // Try direct mapping first
-    if (colorMap[colorName]) return colorMap[colorName];
-    
-    // Try case-insensitive search
-    const lowerColorName = colorName.toLowerCase();
-    const colorKey = Object.keys(colorMap).find(key => 
-      key.toLowerCase() === lowerColorName
-    );
-    
-    return colorKey ? colorMap[colorKey] : '#CCCCCC'; // Default gray if not found
-  };
-
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center h-screen">
@@ -690,7 +585,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
 
   return (
     <div className="min-h-screen py-10 bg-gradient-to-br from-gray-50 to-blue-50">
-      <ScrollProgressBar />
+      <ScrollProgressBar gradient="from-teal-500 via-blue-600 to-purple-600" />
       
       <motion.div 
         className="container mx-auto px-4 mb-12"
@@ -728,8 +623,8 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
               type="text"
               placeholder="Search products..."
               className="p-4 pl-12 border border-gray-200 rounded-xl w-full focus:ring-2 focus:ring-blue-400 shadow-md bg-white text-black transition-all duration-300 hover:shadow-lg outline-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={displaySearch}
+              onChange={handleSearchChange}
             />
           </div>
           <div className="flex gap-3 md:w-1/3">
@@ -748,6 +643,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
+                setDisplaySearch('');
                 setSearchTerm('');
                 setSelectedColors([]);
               }}

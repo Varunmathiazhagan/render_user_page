@@ -1,24 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaSpinner, FaRobot, FaThumbsUp, FaExclamationCircle, FaStar, FaRandom, FaMagic, FaDice, FaLightbulb, FaPalette } from "react-icons/fa";
-import { motion, AnimatePresence, useScroll } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import RobotLoader from './RobotLoader';
 import { useTranslation } from "../utils/TranslationContext";
-
-// Add ScrollProgressBar component with gradient
-const ScrollProgressBar = () => {
-  const { scrollYProgress } = useScroll()
-  
-  return (
-    <motion.div
-      className="fixed top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 origin-left z-50"
-      style={{ scaleX: scrollYProgress }}
-    />
-  )
-}
+import ScrollProgressBar from "./ScrollProgressBar";
 
 const RecommendationsPage = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [error, setError] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -27,14 +18,26 @@ const RecommendationsPage = () => {
   const [sessionSeed, setSessionSeed] = useState(Date.now());
   const [lastInputSignature, setLastInputSignature] = useState("");
 
-  const counts = ['2/20s', '2/30s']; // Only counts found in the data
+  const extractCountLabel = (name = "") => {
+    const normalized = String(name).toLowerCase();
+    if (normalized.includes("2/20")) return "2/20s";
+    if (normalized.includes("2/30")) return "2/30s";
+    if (/\b20\s*\(s\)|\b20s\b/.test(normalized)) return "20s";
+    if (/\b30\s*\(s\)|\b30s\b/.test(normalized)) return "30s";
+    return "";
+  };
 
-  const priceRanges = [
-    '₹120-140/kg',
-    '₹140-160/kg',
-    '₹160-180/kg',
-    '₹180-200/kg'
-  ];
+  const countsFromDb = [...new Set(allProducts.map((item) => extractCountLabel(item.name)).filter(Boolean))];
+  const counts = countsFromDb.length > 0 ? countsFromDb : ['20s', '30s'];
+
+  const prices = allProducts.map((item) => Number(item.price)).filter((price) => Number.isFinite(price));
+  const minPrice = prices.length ? Math.floor(Math.min(...prices) / 20) * 20 : 120;
+  const maxPrice = prices.length ? Math.ceil(Math.max(...prices) / 20) * 20 : 200;
+  const generatedPriceRanges = [];
+  for (let value = minPrice; value < maxPrice; value += 20) {
+    generatedPriceRanges.push(`₹${value}-${value + 20}/kg`);
+  }
+  const priceRanges = generatedPriceRanges.length ? generatedPriceRanges : ['₹120-140/kg', '₹140-160/kg', '₹160-180/kg', '₹180-200/kg'];
 
   const purposes = [
     t('Weaving', 'recommendations'),
@@ -77,6 +80,37 @@ const RecommendationsPage = () => {
     rating: '',
     creativeFactor: '0.5'
   });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchProducts = async () => {
+      setIsFetchingProducts(true);
+      try {
+        const response = await fetch("https://render-user-page.onrender.com/api/products");
+        if (!response.ok) {
+          throw new Error("Failed to fetch products");
+        }
+        const data = await response.json();
+        if (mounted) {
+          setAllProducts(Array.isArray(data) ? data : []);
+        }
+      } catch (fetchError) {
+        if (mounted) {
+          setError("Unable to load product data from database. Please try again.");
+        }
+      } finally {
+        if (mounted) {
+          setIsFetchingProducts(false);
+        }
+      }
+    };
+
+    fetchProducts();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const allRecommendations = [
     [
@@ -362,8 +396,26 @@ const RecommendationsPage = () => {
 
       // Increased timing from 3000ms to 7000ms
       await new Promise(resolve => setTimeout(resolve, 7000));
-      const products = allRecommendations[0][0];
+      const products = allProducts;
+      if (!products.length) {
+        setError("No products available in database right now. Please try again later.");
+        setRecommendations([]);
+        return;
+      }
       const creativity = parseFloat(userPreferences.creativeFactor || uniquenessFactor);
+
+      const ratingThreshold = userPreferences.rating === t('5★ only', 'recommendations')
+        ? 5
+        : userPreferences.rating === t('4.5★ & above', 'recommendations')
+          ? 4.5
+          : userPreferences.rating === t('4★ & above', 'recommendations')
+            ? 4
+            : 0;
+
+      const selectedPriceRange = /₹(\d+)-(\d+)\/kg/.exec(userPreferences.priceRange || "");
+      const minSelectedPrice = selectedPriceRange ? Number(selectedPriceRange[1]) : null;
+      const maxSelectedPrice = selectedPriceRange ? Number(selectedPriceRange[2]) : null;
+      const requestedQuantity = Number(userPreferences.quantity) || 0;
       
       // Apply creative shuffling algorithm
       let productsShuffled = [...products];
@@ -387,17 +439,35 @@ const RecommendationsPage = () => {
             true : // Ignore stock at high creativity
             item.stock > 0;
           
-          return stockCheck;
+          const countCheck = userPreferences.count
+            ? extractCountLabel(item.name) === userPreferences.count
+            : true;
+
+          const ratingCheck = ratingThreshold
+            ? Number(item.rating || 0) >= ratingThreshold
+            : true;
+
+          const priceCheck = minSelectedPrice !== null && maxSelectedPrice !== null
+            ? Number(item.price) >= minSelectedPrice && Number(item.price) <= maxSelectedPrice
+            : true;
+
+          const quantityCheck = requestedQuantity > 0
+            ? Number(item.stock || 0) >= requestedQuantity
+            : true;
+
+          return stockCheck && countCheck && ratingCheck && priceCheck && quantityCheck;
         })
         .map(item => {
           // Apply creativity to item properties
           const creativityInfluence = Math.pow(creativity, 2) * 0.4;
-          const creativePrice = Math.round(item.price * (1 + (seededRandom(sessionSeed + item.id) - 0.5) * creativityInfluence));
+          const basePrice = Number(item.price || 0);
+          const creativePrice = Math.max(1, Math.round(basePrice * (1 + (seededRandom(sessionSeed + item.id) - 0.5) * creativityInfluence)));
           
           return {
             ...item,
             displayPrice: creativePrice,
-            originalPrice: item.price,
+            originalPrice: basePrice,
+            rating: Number(item.rating || 4.5),
             confidence: calculateCreativeConfidence(item, userPreferences, sessionSeed, creativity),
             reason: generateCreativeReason(item, userPreferences, sessionSeed, creativity)
           };
@@ -522,7 +592,7 @@ const RecommendationsPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!userPreferences.color && !userPreferences.count && !userPreferences.priceRange) {
+    if (!userPreferences.count && !userPreferences.priceRange && !userPreferences.rating && !userPreferences.quantity) {
       setError("Please select at least one filter criterion");
       return;
     }
@@ -740,7 +810,7 @@ const RecommendationsPage = () => {
               )}
 
               <AnimatePresence mode='wait'>
-                {loading ? (
+                {loading || isFetchingProducts ? (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}

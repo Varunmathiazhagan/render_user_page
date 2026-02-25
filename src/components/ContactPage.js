@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
+import { motion, AnimatePresence, useScroll } from "framer-motion";
 import {
   FaEnvelope, FaPhone, FaMapMarkerAlt, FaWhatsapp,
   FaMobile, FaBuilding, FaFacebook, FaInstagram,
@@ -7,41 +7,35 @@ import {
   FaArrowUp, FaDownload, FaCheck
 } from "react-icons/fa";
 import { useTranslation } from "../utils/TranslationContext";
+import ScrollProgressBar from "./ScrollProgressBar";
+import { sanitizeFormData } from "../utils/sanitize";
 
-// Scroll Progress Bar
-const ScrollProgressBar = () => {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
-  });
+// Animated Background - pre-computed positions to avoid Math.random() on every render
+const bgItems = Array.from({ length: 3 }, (_, i) => ({
+  id: i,
+  ix: `${(i * 30 + 10) % 100}%`, iy: `${(i * 25 + 15) % 100}%`,
+  ax: `${(i * 35 + 50) % 100}%`, ay: `${(i * 40 + 20) % 100}%`,
+  scale0: 0.6 + i * 0.15, scale1: 0.7 + i * 0.12,
+  dur: 15 + i * 5,
+  size: `${150 + i * 80}px`,
+}));
 
-  return (
-    <motion.div
-      className="fixed top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 to-purple-600 origin-left z-50"
-      style={{ scaleX }}
-    />
-  );
-};
-
-// Animated Background
-const AnimatedBackground = () => {
+const AnimatedBackground = React.memo(() => {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {[...Array(5)].map((_, i) => (
+      {bgItems.map(({ id, ix, iy, ax, ay, scale0, scale1, dur, size }) => (
         <motion.div
-          key={i}
+          key={id}
           className="absolute rounded-full bg-blue-100 opacity-30"
-          initial={{ x: `${Math.random() * 100}%`, y: `${Math.random() * 100}%`, scale: Math.random() * 0.5 + 0.5 }}
-          animate={{ x: `${Math.random() * 100}%`, y: `${Math.random() * 100}%`, scale: Math.random() * 0.5 + 0.5 }}
-          transition={{ duration: Math.random() * 20 + 10, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-          style={{ width: `${Math.random() * 300 + 100}px`, height: `${Math.random() * 300 + 100}px` }}
+          initial={{ x: ix, y: iy, scale: scale0 }}
+          animate={{ x: ax, y: ay, scale: scale1 }}
+          transition={{ duration: dur, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+          style={{ width: size, height: size }}
         />
       ))}
     </div>
   );
-};
+});
 
 // Back to Top Button
 const BackToTopButton = () => {
@@ -454,11 +448,11 @@ const ContactPage = () => {
     setErrorMessage(null);
 
     try {
-      // Prepare data - strip formatting from phone
-      const submissionData = {
+      // Prepare data - strip formatting from phone and sanitize
+      const submissionData = sanitizeFormData({
         ...formData,
         phone: formData.phone.replace(/[^\d]/g, '')
-      };
+      });
       
       const response = await fetch("https://render-user-page.onrender.com/api/contact", {
         method: "POST",
@@ -494,7 +488,7 @@ const ContactPage = () => {
   return (
     <motion.div initial="hidden" animate="show" variants={containerVariants} className="p-6 min-h-screen relative">
       <AnimatedBackground />
-      <ScrollProgressBar />
+      <ScrollProgressBar gradient="from-blue-600 to-purple-600" smooth />
       <BackToTopButton />
       <AnimatePresence>{showSuccess && <SuccessMessage />}</AnimatePresence>
 

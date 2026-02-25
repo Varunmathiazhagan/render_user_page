@@ -87,17 +87,28 @@ const ChatBot = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Debounced localStorage saves to avoid writing on every keystroke/message
+  const saveTimerRef = useRef(null);
   useEffect(() => {
     if (messages.length > 0) {
-      const uniqueMessages = Array.from(
-        new Map(messages.map(msg => [msg.id, msg])).values()
-      );
-      localStorage.setItem('kspChatHistory', JSON.stringify(uniqueMessages));
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        const uniqueMessages = Array.from(
+          new Map(messages.map(msg => [msg.id, msg])).values()
+        );
+        localStorage.setItem('kspChatHistory', JSON.stringify(uniqueMessages));
+      }, 500);
     }
+    return () => clearTimeout(saveTimerRef.current);
   }, [messages]);
 
+  const ctxTimerRef = useRef(null);
   useEffect(() => {
-    localStorage.setItem('kspChatContext', JSON.stringify(conversationContext));
+    if (ctxTimerRef.current) clearTimeout(ctxTimerRef.current);
+    ctxTimerRef.current = setTimeout(() => {
+      localStorage.setItem('kspChatContext', JSON.stringify(conversationContext));
+    }, 500);
+    return () => clearTimeout(ctxTimerRef.current);
   }, [conversationContext]);
 
   useEffect(() => {

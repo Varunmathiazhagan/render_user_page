@@ -59,14 +59,10 @@ const useProducts = () => {
   };
 
   const availableColors = useMemo(() => {
-    console.log('Products data for color extraction:', products);
-    
     // Extract colors from product names
     const colors = products
       .map(product => extractColorFromName(product.name))
       .filter(Boolean);
-    
-    console.log('Extracted colors from names:', colors);
     
     // If no colors extracted, provide default yarn colors
     if (colors.length === 0) {
@@ -117,7 +113,7 @@ const useProducts = () => {
         case 'price-asc':
           return a.price - b.price;
         case 'price-desc':
-          return b.price - b.price;
+          return b.price - a.price;
         case 'name-asc':
           return a.name.localeCompare(b.name);
         case 'name-desc':
