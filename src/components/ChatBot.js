@@ -165,25 +165,15 @@ const ChatBot = () => {
     }
   }, [messages]);
 
-  // Show greeting only on first visit
+  // Auto-dismiss greeting popup after a few seconds
   useEffect(() => {
-    const greetingShown = localStorage.getItem('kspGreetingShown');
-    
-    if (!greetingShown) {
-      // Show greeting with slight delay after page loads
+    if (showGreeting && !isOpen) {
       const timer = setTimeout(() => {
-        setShowGreeting(true);
-        
-        // Hide after 8 seconds
-        setTimeout(() => {
-          setShowGreeting(false);
-          localStorage.setItem('kspGreetingShown', 'true');
-        }, 8000);
-      }, 1000);
-      
+        setShowGreeting(false);
+      }, 5000);
       return () => clearTimeout(timer);
     }
-  }, []); // Empty dependency array means this runs once on mount
+  }, [showGreeting, isOpen]);
 
   const toggleChat = useCallback(() => {
     setIsOpen(!isOpen);
