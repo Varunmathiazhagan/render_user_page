@@ -6,7 +6,7 @@ import { fallbackImageBase64 } from '../assets/fallback';
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import ScrollProgressBar from "./ScrollProgressBar";
-import { colorMap, getColorHex } from "../utils/colorMap";
+import { getColorHex } from "../utils/colorMap";
 
 const ColorPalette = ({ availableColors, selectedColors, toggleColor }) => {
   const [isExpanded, setIsExpanded] = useState(false);

@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { motion, useScroll } from "framer-motion"
+import { motion } from "framer-motion"
 import { Link } from "react-router-dom" // Add this import
 import { FaLeaf, FaRecycle, FaIndustry, FaChevronDown, FaQuoteLeft, FaImages, FaTshirt, FaCar, FaHospital, FaHome, FaCheckCircle, FaTools, FaMicroscope, FaAward, FaClipboardCheck } from "react-icons/fa"
 import { useInView } from "react-intersection-observer"

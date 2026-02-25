@@ -97,6 +97,8 @@ const RecommendationsPage = () => {
         }
       } catch (fetchError) {
         if (mounted) {
+          const fallbackProducts = allRecommendations.flat(2).filter((item) => item && typeof item === "object");
+          setAllProducts(fallbackProducts);
           setError("Unable to load product data from database. Please try again.");
         }
       } finally {
@@ -110,6 +112,7 @@ const RecommendationsPage = () => {
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const allRecommendations = [

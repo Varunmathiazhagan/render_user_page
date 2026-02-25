@@ -23,7 +23,7 @@ import "jspdf-autotable"; // Add this import for table support in PDF
 import { sanitizeInput } from "../utils/sanitize";
 import { FileText } from "lucide-react"; // or use another file icon
 
-const CartPage = ({ cart, updateQuantity, removeFromCart, isLoading, user }) => {
+const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, user }) => {
   const [step, setStep] = useState("cart");
   // Updated shippingInfo to remove the email field
   const [shippingInfo, setShippingInfo] = useState({
