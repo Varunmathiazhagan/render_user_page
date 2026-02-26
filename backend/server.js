@@ -90,6 +90,8 @@ const allowedOrigins = new Set([
   "http://localhost:5173",
   "http://localhost:3000",
   "https://ksp.varunm.tech",
+  "https://www.kspyarns.app",
+  "https://kspyarns.app",
 ]);
 
 const corsOptions = {
