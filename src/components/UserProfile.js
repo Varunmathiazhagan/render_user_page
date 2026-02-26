@@ -142,7 +142,7 @@ const UserProfile = () => {
 
   const API_URL = getApiBaseUrl();
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -180,9 +180,9 @@ const UserProfile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
 
-  const fetchUserOrders = async () => {
+  const fetchUserOrders = useCallback(async () => {
     setLoadingOrders(true);
     setOrdersError(null);
     try {
@@ -229,9 +229,9 @@ const UserProfile = () => {
     } finally {
       setLoadingOrders(false);
     }
-  };
+  }, [API_URL]);
 
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     setLoadingWishlist(true);
     setWishlistError(null);
     try {
@@ -249,7 +249,7 @@ const UserProfile = () => {
     } finally {
       setLoadingWishlist(false);
     }
-  };
+  }, [API_URL]);
 
   const removeFromWishlist = async (productId) => {
     try {
@@ -312,7 +312,7 @@ const UserProfile = () => {
     fetchUserProfile();
     fetchUserOrders();
     fetchWishlist();
-  }, []);
+  }, [fetchUserProfile, fetchUserOrders, fetchWishlist]);
 
   const handleEditToggle = () => {
     setEditMode(!editMode);

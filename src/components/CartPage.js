@@ -81,7 +81,7 @@ const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, us
       const timer = setTimeout(() => setShowConfetti(false), 4000);
       return () => clearTimeout(timer);
     }
-  }, [step, orderReference]);
+  }, [step, orderReference, savedOrder?.orderReference]);
 
   // Handle successful payment - Modified to use setOrderProcessingError
   const handleSuccessfulPayment = (order, method) => {

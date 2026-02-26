@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import useProducts from "../hooks/useProducts";
