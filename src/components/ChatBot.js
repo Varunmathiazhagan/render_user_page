@@ -325,9 +325,16 @@ const ChatBot = () => {
     const userIntent = detectIntent(userMessage);
     const entities = extractEntities(userMessage);
 
-    // Try backend first for product/order related queries
+    // Broad keyword check for product/company-related queries
+    const productRelatedWords = /\b(product|products|item|items|yarn|yarns|cotton|polyester|material|fabric|thread|catalog|catalogue|collection|stock|inventory|sell|offer|available|range)\b/i;
+    const companyRelatedWords = /\b(company|ksp|about|who|factory|manufacture|business|service)\b/i;
+    const isProductRelated = productRelatedWords.test(normalizedMessage);
+    const isCompanyRelated = companyRelatedWords.test(normalizedMessage);
+
+    // Try backend first for product/order/company related queries
     if (['purchase', 'information', 'specification', 'comparison'].includes(userIntent) ||
-        entities.yarnTypes.length > 0 || entities.products.length > 0) {
+        entities.yarnTypes.length > 0 || entities.products.length > 0 ||
+        isProductRelated || isCompanyRelated) {
       const backendResponse = await queryBackendChatbot(userMessage, userIntent, entities);
       if (backendResponse && backendResponse.response) {
         updateConversationContext(backendResponse.topic || 'products');

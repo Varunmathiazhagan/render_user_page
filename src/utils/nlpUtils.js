@@ -187,7 +187,9 @@ export const extractEntities = (text) => {
   });
   
   // Extract product categories
-  const products = ['yarn', 'yarns', 'thread', 'fiber', 'fibre', 'textile'];
+  const products = ['yarn', 'yarns', 'thread', 'fiber', 'fibre', 'textile', 'textiles', 
+                    'product', 'products', 'item', 'items', 'material', 'materials',
+                    'fabric', 'fabrics', 'rope', 'ropes', 'string', 'strings'];
   products.forEach(product => {
     if (text.toLowerCase().includes(product)) {
       entities.products.push(product);
@@ -247,7 +249,13 @@ export const detectIntent = (text) => {
         /^(what|how|which|where|when|why|who)\b/i,
         /tell me (about|more)|can you explain|i need to know|i want to know|i'm looking for|looking for/i,
         /about your company|about ksp|company details|company information/i,
-        /do you (have|offer|provide|sell|make)/i
+        /do you (have|offer|provide|sell|make)/i,
+        /\b(can|could)\s+(u|you|ya)\s+(say|tell|explain|share|describe|show|give|list)/i,
+        /\b(say|tell|share|explain|describe|show|give|know|learn|info|information)\b.*\b(about|regarding|on|of)\b/i,
+        /\bi\s*(wanna|want\s*to|need\s*to|would\s*like\s*to)\s*(know|learn|see|hear|find)/i,
+        /\b(detail|details|more|info|information|overview)\s*(about|on|of|for)?\b/i,
+        /\bwhat\s*(is|are|about)\b/i,
+        /\b(show|list|display)\s*(me)?\s*(the|your|all|some)?\b/i
       ],
       priority: 8
     },
@@ -256,7 +264,8 @@ export const detectIntent = (text) => {
         /\b(buy|purchase|order|ordering|checkout|cart|payment|pay for)\b/i,
         /\b(price|pricing|cost|costs|how much|rate|rates|quote)\b/i,
         /i want to (buy|purchase|order|get)/i,
-        /place an order|make an order/i
+        /place an order|make an order/i,
+        /\b(i\s*wanna|i\s*want\s*to|i\s*need\s*to)\s*(buy|order|get|purchase)/i
       ],
       priority: 9
     },
