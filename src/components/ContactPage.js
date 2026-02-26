@@ -10,6 +10,7 @@ import { useTranslation } from "../utils/TranslationContext";
 import ScrollProgressBar from "./ScrollProgressBar";
 import { sanitizeFormData } from "../utils/sanitize";
 import { getApiBaseUrl } from "../utils/apiClient";
+import { useForm, ValidationError } from '@formspree/react';
 
 // Animated Background - pre-computed positions to avoid Math.random() on every render
 const bgItems = Array.from({ length: 3 }, (_, i) => ({
@@ -308,6 +309,9 @@ const ContactPage = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
+  // Formspree integration
+  const [formspreeState, handleFormspreeSubmit] = useForm("mwvnybnl");
+
   const contactNumbers = [
     { 
       type: t('Office', 'contact'), 
@@ -455,7 +459,17 @@ const ContactPage = () => {
         ...formData,
         phone: formData.phone.replace(/[^\d]/g, '')
       });
-      
+
+      // Submit to Formspree (email notification)
+      await handleFormspreeSubmit({
+        name: submissionData.name,
+        email: submissionData.email,
+        phone: submissionData.phone,
+        subject: submissionData.subject,
+        message: submissionData.message
+      });
+
+      // Also submit to backend (database storage)
       const response = await fetch(`${API_BASE_URL}/api/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -581,15 +595,21 @@ const ContactPage = () => {
                 />
               </div>
               <FormInput
-                id="email"
-                name="email"
-                type="email"
-                label={formFields.email.label}
-                value={formData.email}
-                onChange={handleChange}
-                error={errors.email}
-                placeholder={formFields.email.placeholder}
-              />
+                  id="email"
+                  name="email"
+                  type="email"
+                  label={formFields.email.label}
+                  value={formData.email}
+                  onChange={handleChange}
+                  error={errors.email}
+                  placeholder={formFields.email.placeholder}
+                />
+                <ValidationError 
+                  prefix="Email" 
+                  field="email"
+                  errors={formspreeState.errors}
+                  className="mt-1 text-red-500 text-sm"
+                />
               <FormInput
                 id="subject"
                 name="subject"
@@ -626,15 +646,21 @@ const ContactPage = () => {
                     <span aria-hidden="true">⚠️</span> {errors.message}
                   </motion.p>
                 )}
+                <ValidationError 
+                  prefix="Message" 
+                  field="message"
+                  errors={formspreeState.errors}
+                  className="mt-1 text-red-500 text-sm"
+                />
               </motion.div>
               <motion.button 
                 type="submit" 
                 whileHover={{ scale: 1.03 }} 
                 whileTap={{ scale: 0.97 }} 
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-800 text-white px-8 py-4 rounded-lg flex items-center justify-center font-medium text-lg" 
-                disabled={isLoading}
+                disabled={isLoading || formspreeState.submitting}
               >
-                <FaPaperPlane className="mr-2" /> {isLoading ? t('Sending...', 'contact') : t('Send Message', 'contact')}
+                <FaPaperPlane className="mr-2" /> {(isLoading || formspreeState.submitting) ? t('Sending...', 'contact') : t('Send Message', 'contact')}
               </motion.button>
               {errorMessage && (
                 <motion.div 

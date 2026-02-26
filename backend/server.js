@@ -1265,7 +1265,10 @@ app.post('/api/chatbot/query', chatbotLimiter, async (req, res) => {
     let productData = [];
 
     // Check for product-related queries
-    const productKeywords = ['product', 'yarn', 'cotton', 'polyester', 'price', 'cost', 'buy', 'order', 'stock', 'available', 'color', 'category'];
+    const productKeywords = ['product', 'products', 'yarn', 'yarns', 'cotton', 'polyester', 'price', 'cost', 'buy', 
+                              'order', 'stock', 'available', 'color', 'category', 'item', 'items', 'material',
+                              'fabric', 'thread', 'catalog', 'catalogue', 'collection', 'range', 'offer', 'sell',
+                              'inventory', 'textile', 'rope'];
     const isProductQuery = keywords.some(kw => productKeywords.includes(kw)) || 
                            (entities && (entities.yarnTypes?.length > 0 || entities.products?.length > 0));
 
@@ -1285,9 +1288,10 @@ app.post('/api/chatbot/query', chatbotLimiter, async (req, res) => {
 
       // Search by general keywords
       keywords.forEach(kw => {
-        if (kw.length > 3 && !['what', 'which', 'where', 'when', 'have', 'does', 'about', 'tell', 'show'].includes(kw)) {
+        if (kw.length > 3 && !['what', 'which', 'where', 'when', 'have', 'does', 'about', 'tell', 'show', 'know', 'give', 'need', 'want', 'like', 'product', 'products', 'item', 'items', 'your', 'that', 'this', 'some', 'please', 'could', 'would', 'should', 'much'].includes(kw)) {
           orConditions.push({ name: new RegExp(kw, 'i') });
           orConditions.push({ category: new RegExp(kw, 'i') });
+          orConditions.push({ description: new RegExp(kw, 'i') });
         }
       });
 
@@ -1295,8 +1299,18 @@ app.post('/api/chatbot/query', chatbotLimiter, async (req, res) => {
         searchQuery.$or = orConditions;
       }
 
-      // Query products from database
-      const products = await Product.find(searchQuery).limit(5).lean();
+      // Query products from database - if no specific filters, get a sample of products
+      let products;
+      if (Object.keys(searchQuery).length === 0) {
+        // No specific search criteria - return a general product overview
+        products = await Product.find().limit(5).lean();
+      } else {
+        products = await Product.find(searchQuery).limit(5).lean();
+        // If specific search returned nothing, fall back to all products
+        if (products.length === 0) {
+          products = await Product.find().limit(5).lean();
+        }
+      }
 
       if (products.length > 0) {
         productData = products.map(p => ({
