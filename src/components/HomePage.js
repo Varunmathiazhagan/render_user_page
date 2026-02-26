@@ -6,6 +6,7 @@ import { FaLeaf, FaRecycle, FaIndustry, FaChevronDown, FaQuoteLeft, FaImages, Fa
 import { useInView } from "react-intersection-observer"
 import { useTranslation } from "../utils/TranslationContext" // Import the translation hook
 import ScrollProgressBar from "./ScrollProgressBar"
+import { fetchProductsCached } from "../utils/apiClient"
 
 // VideoBackground Component
 const VideoBackground = () => {
@@ -366,11 +367,7 @@ const ProductShowcaseSection = () => {
 
     const fetchShowcaseProducts = async () => {
       try {
-        const response = await fetch("https://render-user-page.onrender.com/api/products")
-        if (!response.ok) {
-          throw new Error("Failed to fetch products")
-        }
-        const data = await response.json()
+        const data = await fetchProductsCached()
         if (!mounted) return
 
         const mapped = (Array.isArray(data) ? data : [])

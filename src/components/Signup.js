@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
+import { getApiBaseUrl } from "../utils/apiClient";
 import {
   FaEnvelope,
   FaLock,
@@ -14,6 +15,7 @@ import {
 } from "react-icons/fa";
 
 const Signup = ({ setIsAuthenticated }) => {
+  const API_BASE_URL = getApiBaseUrl();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
@@ -105,7 +107,7 @@ const Signup = ({ setIsAuthenticated }) => {
         password: formData.password,
       };
 
-      const response = await axios.post("https://render-user-page.onrender.com/signup", signupData);
+      const response = await axios.post(`${API_BASE_URL}/signup`, signupData);
 
       if (response.data && response.data.token) {
         const tokenExpiry = new Date();
@@ -137,7 +139,7 @@ const Signup = ({ setIsAuthenticated }) => {
       }
 
       const response = await axios.post(
-        "https://render-user-page.onrender.com/oauth/google",
+        `${API_BASE_URL}/oauth/google`,
         { 
           token: credential,
           action: "signup" // Explicitly state this is a signup attempt

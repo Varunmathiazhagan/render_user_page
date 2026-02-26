@@ -4,6 +4,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
+const crypto = require("crypto");
 const nodemailer = require('nodemailer'); // Add Nodemailer dependency
 
 const app = express();
@@ -18,7 +19,7 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'");
+  // CSP omitted — this is an API-only server; frontend CSP is set by the hosting platform
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
@@ -56,6 +57,19 @@ setInterval(() => {
     else rateLimitStore.set(key, filtered);
   }
 }, 60000);
+
+// Input sanitization helper
+const sanitizeString = (str, maxLength = 500) => {
+  if (typeof str !== 'string') return '';
+  // Remove HTML tags, trim whitespace, limit length
+  return str.replace(/<[^>]*>/g, '').trim().slice(0, maxLength);
+};
+
+// Validate productId format (alphanumeric, dashes, underscores only)
+const isValidProductId = (productId) => {
+  if (typeof productId !== 'string') return false;
+  return /^[a-zA-Z0-9_-]{1,50}$/.test(productId);
+};
 
 // Rate limiters for different endpoint groups
 const authLimiter = createRateLimiter(15 * 60 * 1000, 20); // 20 attempts per 15 min
@@ -323,6 +337,33 @@ const formatProduct = (product) => ({
   stock: product.stock,
   createdAt: product.createdAt
 });
+
+const PRODUCTS_CACHE_TTL_MS = 30 * 1000;
+let productsCache = {
+  data: null,
+  etag: null,
+  lastModified: null,
+  expiresAt: 0,
+};
+
+const invalidateProductsCache = () => {
+  productsCache = {
+    data: null,
+    etag: null,
+    lastModified: null,
+    expiresAt: 0,
+  };
+};
+
+const setProductCacheHeaders = (res, etag, lastModified) => {
+  res.setHeader("Cache-Control", "public, max-age=30, must-revalidate");
+  if (etag) {
+    res.setHeader("ETag", etag);
+  }
+  if (lastModified) {
+    res.setHeader("Last-Modified", lastModified);
+  }
+};
 
 // Login Endpoint
 app.post("/login", authLimiter, async (req, res) => {
@@ -695,7 +736,7 @@ const sendOrderNotification = async (to, subject, text) => {
 };
 
 // Create New Order Endpoint
-app.post("/api/orders", async (req, res) => {
+app.post("/api/orders", authenticateToken, async (req, res) => {
   try {
     const {
       userId,
@@ -716,6 +757,8 @@ app.post("/api/orders", async (req, res) => {
     if (
       !userEmail ||
       !orderItems ||
+      !Array.isArray(orderItems) ||
+      orderItems.length === 0 ||
       !shippingInfo ||
       !shippingInfo.phone || // Ensure phone is provided
       !deliveryMethod ||
@@ -756,7 +799,8 @@ app.post("/api/orders", async (req, res) => {
       }
     }
 
-    const processedOrderItems = [];
+    // ── Pass 1: Validate every item exists and has enough stock ──
+    const validatedItems = [];
 
     for (const item of orderItems) {
       if (!item.productId) {
@@ -786,7 +830,6 @@ app.post("/api/orders", async (req, res) => {
         });
       }
 
-      // Atomic stock decrement to prevent race conditions (overselling)
       const quantity = parseInt(item.quantity);
       if (!quantity || quantity < 1) {
         return res.status(400).json({
@@ -795,6 +838,22 @@ app.post("/api/orders", async (req, res) => {
         });
       }
 
+      if (product.stock < quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for product: ${product.name}`,
+        });
+      }
+
+      validatedItems.push({ product, quantity, isNumericId, item });
+    }
+
+    // ── Pass 2: Atomically decrement stock; roll back on failure ──
+    const processedOrderItems = [];
+    const decrementedProducts = []; // track for rollback
+    let stockMutated = false;
+
+    for (const { product, quantity, isNumericId, item } of validatedItems) {
       const updatedProduct = await Product.findOneAndUpdate(
         { _id: product._id, stock: { $gte: quantity } },
         { $inc: { stock: -quantity } },
@@ -802,11 +861,21 @@ app.post("/api/orders", async (req, res) => {
       );
 
       if (!updatedProduct) {
+        // Roll back all previous decrements
+        for (const rollback of decrementedProducts) {
+          await Product.findByIdAndUpdate(
+            rollback.productId,
+            { $inc: { stock: rollback.quantity } }
+          );
+        }
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for product: ${product.name}`,
+          message: `Insufficient stock for product: ${product.name} (race condition). No items were charged.`,
         });
       }
+
+      stockMutated = true;
+      decrementedProducts.push({ productId: product._id, quantity });
 
       processedOrderItems.push({
         productId: isNumericId ? product.id.toString() : product._id.toString(),
@@ -856,6 +925,10 @@ app.post("/api/orders", async (req, res) => {
     }
 
     const savedOrder = await newOrder.save();
+
+    if (stockMutated) {
+      invalidateProductsCache();
+    }
 
     if (validatedUserId) {
       await User.findByIdAndUpdate(
@@ -976,25 +1049,51 @@ app.post("/api/user/wishlist", authenticateToken, async (req, res) => {
   try {
     const { productId, name, price, image, description, category } = req.body;
 
+    // Validate required fields
     if (!productId || !name || price === undefined) {
       return res.status(400).json({ message: "Missing required product information" });
+    }
+
+    // Sanitize and validate productId
+    const sanitizedProductId = String(productId).trim();
+    if (!isValidProductId(sanitizedProductId)) {
+      return res.status(400).json({ message: "Invalid product ID format" });
+    }
+
+    // Validate price is a positive number
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return res.status(400).json({ message: "Invalid price value" });
+    }
+
+    // Sanitize string inputs
+    const sanitizedName = sanitizeString(name, 200);
+    const sanitizedDescription = sanitizeString(description, 1000);
+    const sanitizedCategory = sanitizeString(category, 100);
+
+    // Validate image is a valid base64 or URL (basic check)
+    let sanitizedImage = '';
+    if (image) {
+      if (typeof image === 'string' && (image.startsWith('data:image/') || image.startsWith('/') || image.length < 5000000)) {
+        sanitizedImage = image;
+      }
     }
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const existingItem = user.wishlist.find((item) => item.productId === productId);
+    const existingItem = user.wishlist.find((item) => item.productId === sanitizedProductId);
     if (existingItem) {
       return res.status(400).json({ message: "Item already in wishlist" });
     }
 
     user.wishlist.push({
-      productId,
-      name,
-      price,
-      image,
-      description,
-      category,
+      productId: sanitizedProductId,
+      name: sanitizedName,
+      price: numPrice,
+      image: sanitizedImage,
+      description: sanitizedDescription,
+      category: sanitizedCategory,
       addedAt: new Date(),
     });
 
@@ -1017,11 +1116,17 @@ app.delete("/api/user/wishlist/:productId", authenticateToken, async (req, res) 
   try {
     const { productId } = req.params;
 
+    // Validate productId format
+    const sanitizedProductId = decodeURIComponent(productId).trim();
+    if (!isValidProductId(sanitizedProductId)) {
+      return res.status(400).json({ message: "Invalid product ID format" });
+    }
+
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const initialLength = user.wishlist.length;
-    user.wishlist = user.wishlist.filter((item) => item.productId !== productId);
+    user.wishlist = user.wishlist.filter((item) => item.productId !== sanitizedProductId);
 
     if (user.wishlist.length === initialLength) {
       return res.status(404).json({ message: "Item not found in wishlist" });
@@ -1068,8 +1173,55 @@ app.delete("/api/user/wishlist", authenticateToken, async (req, res) => {
 // GET all products for public access
 app.get("/api/products", async (req, res) => {
   try {
+    const now = Date.now();
+    const cacheValid = productsCache.data && productsCache.expiresAt > now;
+
+    if (cacheValid) {
+      const ifNoneMatch = req.headers["if-none-match"];
+      const ifModifiedSince = req.headers["if-modified-since"];
+      if (
+        (ifNoneMatch && productsCache.etag && ifNoneMatch === productsCache.etag) ||
+        (ifModifiedSince &&
+          productsCache.lastModified &&
+          new Date(ifModifiedSince).getTime() >= new Date(productsCache.lastModified).getTime())
+      ) {
+        setProductCacheHeaders(res, productsCache.etag, productsCache.lastModified);
+        res.setHeader("X-Cache", "HIT-304");
+        return res.status(304).end();
+      }
+
+      setProductCacheHeaders(res, productsCache.etag, productsCache.lastModified);
+      res.setHeader("X-Cache", "HIT");
+      return res.json(productsCache.data);
+    }
+
     const products = await Product.find().lean();
-    res.json(products.map(formatProduct));
+    const formattedProducts = products.map(formatProduct);
+    const payloadString = JSON.stringify(formattedProducts);
+    const etag = `W/\"${crypto.createHash("sha1").update(payloadString).digest("hex")}\"`;
+    const lastModified = new Date().toUTCString();
+
+    productsCache = {
+      data: formattedProducts,
+      etag,
+      lastModified,
+      expiresAt: now + PRODUCTS_CACHE_TTL_MS,
+    };
+
+    const ifNoneMatch = req.headers["if-none-match"];
+    const ifModifiedSince = req.headers["if-modified-since"];
+    if (
+      (ifNoneMatch && ifNoneMatch === etag) ||
+      (ifModifiedSince && new Date(ifModifiedSince).getTime() >= new Date(lastModified).getTime())
+    ) {
+      setProductCacheHeaders(res, etag, lastModified);
+      res.setHeader("X-Cache", "MISS-304");
+      return res.status(304).end();
+    }
+
+    setProductCacheHeaders(res, etag, lastModified);
+    res.setHeader("X-Cache", "MISS");
+    res.json(formattedProducts);
   } catch (err) {
     console.error("Error fetching products:", err);
     res.status(500).json({ error: "Failed to fetch products", details: err.message });
@@ -1077,7 +1229,255 @@ app.get("/api/products", async (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-  res.status(200).send('OK');
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
+    database: dbConnected ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Chatbot rate limiter - 30 requests per minute
+const chatbotLimiter = createRateLimiter(60 * 1000, 30);
+
+// Chatbot query endpoint - intelligent product search and assistance
+app.post('/api/chatbot/query', chatbotLimiter, async (req, res) => {
+  try {
+    const { message, intent, entities, context } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    // Sanitize input
+    const sanitizedMessage = sanitizeString(message, 500).toLowerCase();
+
+    // Extract keywords from the message
+    const keywords = sanitizedMessage
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2);
+
+    let response = null;
+    let topic = 'general';
+    let suggestedQuestions = [];
+    let productData = [];
+
+    // Check for product-related queries
+    const productKeywords = ['product', 'yarn', 'cotton', 'polyester', 'price', 'cost', 'buy', 'order', 'stock', 'available', 'color', 'category'];
+    const isProductQuery = keywords.some(kw => productKeywords.includes(kw)) || 
+                           (entities && (entities.yarnTypes?.length > 0 || entities.products?.length > 0));
+
+    if (isProductQuery) {
+      // Build search query based on entities and keywords
+      const searchQuery = {};
+      const orConditions = [];
+
+      // Search by yarn types mentioned
+      if (entities?.yarnTypes?.length > 0) {
+        entities.yarnTypes.forEach(type => {
+          orConditions.push({ name: new RegExp(type, 'i') });
+          orConditions.push({ description: new RegExp(type, 'i') });
+          orConditions.push({ category: new RegExp(type, 'i') });
+        });
+      }
+
+      // Search by general keywords
+      keywords.forEach(kw => {
+        if (kw.length > 3 && !['what', 'which', 'where', 'when', 'have', 'does', 'about', 'tell', 'show'].includes(kw)) {
+          orConditions.push({ name: new RegExp(kw, 'i') });
+          orConditions.push({ category: new RegExp(kw, 'i') });
+        }
+      });
+
+      if (orConditions.length > 0) {
+        searchQuery.$or = orConditions;
+      }
+
+      // Query products from database
+      const products = await Product.find(searchQuery).limit(5).lean();
+
+      if (products.length > 0) {
+        productData = products.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          stock: p.stock,
+          category: p.category
+        }));
+
+        // Generate intelligent response based on query type
+        if (intent === 'purchase' || sanitizedMessage.includes('buy') || sanitizedMessage.includes('order')) {
+          topic = 'ordering';
+          const productList = products.slice(0, 3).map(p => 
+            `• ${p.name} - ₹${p.price.toFixed(2)} (${p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'})`
+          ).join('\n');
+          response = `Great choice! Here are some products matching your query:\n\n${productList}\n\nYou can add any of these to your cart from our Products page. Would you like more details about any of these?`;
+          suggestedQuestions = [
+            'What are the yarn specifications?',
+            'Do you offer bulk discounts?',
+            'How do I place an order?'
+          ];
+        } else if (intent === 'specification' || sanitizedMessage.includes('spec') || sanitizedMessage.includes('detail')) {
+          topic = 'specifications';
+          const product = products[0];
+          response = `Here are the details for ${product.name}:\n\n• Price: ₹${product.price.toFixed(2)}\n• Category: ${product.category}\n• Stock: ${product.stock > 0 ? `${product.stock} units available` : 'Currently out of stock'}\n• Description: ${product.description || 'Premium quality yarn'}\n\nWould you like to know about other products?`;
+          suggestedQuestions = [
+            'What other colors are available?',
+            'What is the minimum order quantity?',
+            'Tell me about sustainability practices'
+          ];
+        } else if (sanitizedMessage.includes('price') || sanitizedMessage.includes('cost') || sanitizedMessage.includes('how much')) {
+          topic = 'pricing';
+          const priceList = products.slice(0, 5).map(p => 
+            `• ${p.name}: ₹${p.price.toFixed(2)}`
+          ).join('\n');
+          response = `Here are the prices for matching products:\n\n${priceList}\n\nPrices may vary based on quantity. For bulk orders, please contact our sales team.`;
+          suggestedQuestions = [
+            'Do you offer bulk discounts?',
+            'What are the payment options?',
+            'How do I get a quote?'
+          ];
+        } else if (sanitizedMessage.includes('stock') || sanitizedMessage.includes('available') || sanitizedMessage.includes('in stock')) {
+          topic = 'stock';
+          const stockList = products.map(p => 
+            `• ${p.name}: ${p.stock > 0 ? `${p.stock} units available` : '❌ Out of stock'}`
+          ).join('\n');
+          response = `Stock availability:\n\n${stockList}\n\nStock levels are updated in real-time. Would you like to place an order?`;
+          suggestedQuestions = [
+            'How do I place an order?',
+            'When will out-of-stock items be available?',
+            'Can I pre-order items?'
+          ];
+        } else {
+          // General product information
+          topic = 'products';
+          const productSummary = products.slice(0, 3).map(p => 
+            `• ${p.name} (${p.category}) - ₹${p.price.toFixed(2)}`
+          ).join('\n');
+          response = `I found these products matching your query:\n\n${productSummary}\n\nWould you like more details about any of these, or help with placing an order?`;
+          suggestedQuestions = [
+            'Tell me more about the first product',
+            'What colors are available?',
+            'How do I place an order?'
+          ];
+        }
+      } else {
+        // No products found
+        topic = 'products';
+        response = `I couldn't find specific products matching "${sanitizedMessage}". Let me help you:\n\nWe offer a wide range of yarns including:\n• Cotton yarns\n• Polyester yarns\n• Blended yarns\n• Recycled/sustainable yarns\n\nWould you like to browse our full product catalog or tell me more specifically what you're looking for?`;
+        suggestedQuestions = [
+          'Show me all cotton yarns',
+          'What sustainable products do you have?',
+          'What are your best sellers?'
+        ];
+      }
+    }
+
+    // Check for company/about queries
+    if (!response && (sanitizedMessage.includes('company') || sanitizedMessage.includes('about') || 
+        sanitizedMessage.includes('ksp') || sanitizedMessage.includes('who are'))) {
+      topic = 'company';
+      response = `KSP Yarns is a leading manufacturer of high-quality yarns with a strong commitment to sustainability. We specialize in:\n\n• Premium cotton and polyester yarns\n• Eco-friendly recycled yarn options\n• Custom yarn solutions for various industries\n\nWith years of experience and certifications like GRS (Global Recycled Standard), we serve customers worldwide with quality products and excellent service.`;
+      suggestedQuestions = [
+        'What certifications do you have?',
+        'Where are you located?',
+        'How can I contact you?'
+      ];
+    }
+
+    // Check for order/shipping queries
+    if (!response && (sanitizedMessage.includes('ship') || sanitizedMessage.includes('deliver') || 
+        sanitizedMessage.includes('order status') || sanitizedMessage.includes('track'))) {
+      topic = 'shipping';
+      response = `Shipping & Delivery Information:\n\n• We ship worldwide with reliable logistics partners\n• Standard delivery: 5-7 business days (domestic)\n• International shipping: 10-15 business days\n• Express options available for urgent orders\n\nFor order tracking, please log into your account or contact our support team with your order reference number.`;
+      suggestedQuestions = [
+        'What are the shipping costs?',
+        'Do you ship internationally?',
+        'How can I track my order?'
+      ];
+    }
+
+    // Check for contact queries
+    if (!response && (sanitizedMessage.includes('contact') || sanitizedMessage.includes('reach') || 
+        sanitizedMessage.includes('email') || sanitizedMessage.includes('phone') || sanitizedMessage.includes('call'))) {
+      topic = 'contact';
+      response = `You can reach us through:\n\n📧 Email: contact@kspyarns.com\n📞 Phone: Available on our Contact page\n📍 Visit our Contact page for our full address and a contact form\n\nOur team typically responds within 24 business hours. For urgent inquiries, please call us directly.`;
+      suggestedQuestions = [
+        'What are your business hours?',
+        'Where are you located?',
+        'Can I visit your factory?'
+      ];
+    }
+
+    // Return response
+    if (response) {
+      return res.json({
+        success: true,
+        response,
+        topic,
+        suggestedQuestions,
+        productData: productData.length > 0 ? productData : undefined
+      });
+    }
+
+    // No specific match - return null to let frontend handle it
+    return res.json({
+      success: true,
+      response: null,
+      topic: 'general'
+    });
+
+  } catch (error) {
+    console.error('Chatbot query error:', error);
+    res.status(500).json({ message: 'Failed to process query' });
+  }
+});
+
+// Get product categories for chatbot
+app.get('/api/chatbot/categories', async (req, res) => {
+  try {
+    const categories = await Product.distinct('category');
+    res.json({ success: true, categories });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ message: 'Failed to fetch categories' });
+  }
+});
+
+// Get product statistics for chatbot
+app.get('/api/chatbot/stats', async (req, res) => {
+  try {
+    const totalProducts = await Product.countDocuments();
+    const inStockProducts = await Product.countDocuments({ stock: { $gt: 0 } });
+    const categories = await Product.distinct('category');
+    const priceRange = await Product.aggregate([
+      {
+        $group: {
+          _id: null,
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+          avgPrice: { $avg: '$price' }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalProducts,
+        inStockProducts,
+        outOfStock: totalProducts - inStockProducts,
+        categoryCount: categories.length,
+        categories,
+        priceRange: priceRange[0] || { minPrice: 0, maxPrice: 0, avgPrice: 0 }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ message: 'Failed to fetch stats' });
+  }
 });
 
 // Handle 404 routes (must be after all other routes)

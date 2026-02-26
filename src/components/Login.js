@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
+import { getApiBaseUrl } from "../utils/apiClient";
 import {
   FaEnvelope,
   FaLock,
@@ -12,6 +13,7 @@ import {
 } from "react-icons/fa";
 
 const Login = ({ setIsAuthenticated }) => {
+  const API_BASE_URL = getApiBaseUrl();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
@@ -48,7 +50,7 @@ const Login = ({ setIsAuthenticated }) => {
         password: formData.password,
       };
 
-      const response = await axios.post("https://render-user-page.onrender.com/login", loginData);
+      const response = await axios.post(`${API_BASE_URL}/login`, loginData);
 
       if (response.data && response.data.token) {
         const tokenExpiry = new Date();
@@ -80,7 +82,7 @@ const Login = ({ setIsAuthenticated }) => {
       }
 
       const response = await axios.post(
-        "https://render-user-page.onrender.com/oauth/google",
+        `${API_BASE_URL}/oauth/google`,
         { 
           token: credential,
           action: "signin" // Explicitly state this is a signin attempt

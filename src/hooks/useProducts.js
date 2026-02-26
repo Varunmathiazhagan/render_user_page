@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { fetchProductsCached, checkBackendConnection } from '../utils/apiClient';
 
 const useProducts = () => {
   const [products, setProducts] = useState([]);
@@ -14,13 +15,16 @@ const useProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('https://render-user-page.onrender.com/api/products');
-      if (!response.ok) throw new Error('Failed to fetch products');
-      const data = await response.json();
+      const data = await fetchProductsCached();
       setProducts(data);
       setLoading(false);
     } catch (err) {
-      setError(err.message);
+      const health = await checkBackendConnection();
+      if (!health.ok) {
+        setError('Backend connection failed. Please check if the server is running and reachable.');
+      } else {
+        setError(err.message);
+      }
       setLoading(false);
     }
   };

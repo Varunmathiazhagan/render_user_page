@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom"; // Add this import
+import { Link, useNavigate } from "react-router-dom";
 import {
   FaTrash,
   FaMinus,
@@ -24,6 +24,7 @@ import { sanitizeInput } from "../utils/sanitize";
 import { FileText } from "lucide-react"; // or use another file icon
 
 const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, user }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState("cart");
   // Updated shippingInfo to remove the email field
   const [shippingInfo, setShippingInfo] = useState({
@@ -75,7 +76,7 @@ const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, us
   // Generate order reference
   useEffect(() => {
     if (step === "confirmation" && !orderReference) {
-      setOrderReference(`ORD-${Math.floor(Math.random() * 1000000)}`);
+      setOrderReference(savedOrder?.orderReference || `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`);
       setShowConfetti(true);
       const timer = setTimeout(() => setShowConfetti(false), 4000);
       return () => clearTimeout(timer);
@@ -191,6 +192,20 @@ const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, us
     // Basic validation for required fields
     if (!fullName || !addressLine1 || !city || !postalCode || !phone) {
       alert("Please fill in all fields.");
+      return;
+    }
+
+    // Validate phone number (10-15 digits, optional leading +)
+    const phoneRegex = /^\+?\d{10,15}$/;
+    if (!phoneRegex.test(phone.replace(/[\s-]/g, ''))) {
+      alert("Please enter a valid phone number (10-15 digits).");
+      return;
+    }
+
+    // Validate postal code (4-10 alphanumeric characters)
+    const postalRegex = /^[A-Za-z0-9\s-]{4,10}$/;
+    if (!postalRegex.test(postalCode)) {
+      alert("Please enter a valid postal code.");
       return;
     }
 
@@ -316,13 +331,21 @@ const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, us
                     </motion.span>
                     <motion.button
                       variants={quantityButtonVariants}
-                      whileHover="hover"
-                      whileTap="tap"
+                      whileHover={item.stock != null && item.quantity >= item.stock ? undefined : "hover"}
+                      whileTap={item.stock != null && item.quantity >= item.stock ? undefined : "tap"}
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="bg-gray-200 p-2 rounded-full transition-colors duration-200"
+                      disabled={item.stock != null && item.quantity >= item.stock}
+                      className={`p-2 rounded-full transition-colors duration-200 ${
+                        item.stock != null && item.quantity >= item.stock
+                          ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                          : "bg-gray-200"
+                      }`}
                     >
                       <FaPlus />
                     </motion.button>
+                    {item.stock != null && item.quantity >= item.stock && (
+                      <span className="text-xs text-orange-500 ml-1 whitespace-nowrap">Max</span>
+                    )}
                   </div>
                 </td>
                 <td className="py-4 font-semibold">₹{(item.price * item.quantity).toFixed(2)}</td>
@@ -358,7 +381,14 @@ const CartPage = ({ cart, setCart, updateQuantity, removeFromCart, isLoading, us
             variants={checkoutButtonVariants}
             whileHover="hover"
             whileTap="tap"
-            onClick={() => setStep("shipping")}
+            onClick={() => {
+              if (!user || !user.email) {
+                alert("Please sign in to proceed to checkout.");
+                navigate('/login');
+                return;
+              }
+              setStep("shipping");
+            }}
             className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 text-lg font-semibold mt-4"
           >
             Continue to Shipping

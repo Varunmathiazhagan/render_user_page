@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import { TranslationProvider } from './utils/TranslationContext';
+import axios from 'axios';
 import './App.css';
 
 // Lazy-loaded routes for code splitting & faster initial load
@@ -55,7 +56,15 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const App = () => {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cart');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
@@ -89,17 +98,53 @@ const App = () => {
     }
   }, [setIsAuthenticated, navigate]);
 
+  // Intercept 401 responses globally so expired tokens are caught mid-session
+  useEffect(() => {
+    const id = window.__axiosInterceptor401;
+    if (id !== undefined) return; // already installed
+
+    const interceptorId = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('tokenExpiry');
+          setIsAuthenticated(false);
+          navigate('/login');
+        }
+        return Promise.reject(error);
+      }
+    );
+    window.__axiosInterceptor401 = interceptorId;
+
+    return () => {
+      axios.interceptors.response.eject(interceptorId);
+      delete window.__axiosInterceptor401;
+    };
+  }, [setIsAuthenticated, navigate]);
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    } catch (e) {
+      console.warn('Failed to save cart to localStorage:', e);
+    }
+  }, [cart]);
+
   const addToCart = (product) => {
     setCart((prevCart) => {
       const existingProduct = prevCart.find((item) => item.id === product.id);
       if (existingProduct) {
         return prevCart.map((item) =>
           item.id === product.id
-            ? { ...item, quantity: item.quantity + product.quantity }
+            ? { ...item, quantity: Math.min(item.quantity + product.quantity, item.stock || Infinity) }
             : item
         );
       } else {
-        return [...prevCart, product];
+        const maxQty = product.stock != null ? Math.min(product.quantity, product.stock) : product.quantity;
+        return [...prevCart, { ...product, quantity: maxQty }];
       }
     });
   };
@@ -108,7 +153,9 @@ const App = () => {
     if (newQuantity < 1) return;
     setCart((prevCart) =>
       prevCart.map((item) =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
+        item.id === productId
+          ? { ...item, quantity: Math.min(newQuantity, item.stock || Infinity) }
+          : item
       )
     );
   };

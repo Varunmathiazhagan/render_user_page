@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "../utils/TranslationContext";
 import ScrollProgressBar from "./ScrollProgressBar";
 import { sanitizeFormData } from "../utils/sanitize";
+import { getApiBaseUrl } from "../utils/apiClient";
 
 // Animated Background - pre-computed positions to avoid Math.random() on every render
 const bgItems = Array.from({ length: 3 }, (_, i) => ({
@@ -280,6 +281,7 @@ const LocationMap = ({ t }) => {
 
 // Main Contact Page Component
 const ContactPage = () => {
+  const API_BASE_URL = getApiBaseUrl();
   const { t } = useTranslation();
   const formRef = useRef(null);
 
@@ -454,7 +456,7 @@ const ContactPage = () => {
         phone: formData.phone.replace(/[^\d]/g, '')
       });
       
-      const response = await fetch("https://render-user-page.onrender.com/api/contact", {
+      const response = await fetch(`${API_BASE_URL}/api/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submissionData)

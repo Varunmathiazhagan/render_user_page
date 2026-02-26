@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown } from "react-icons/fa";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { FaRupeeSign, FaSpinner, FaSearch, FaRegHeart, FaHeart, FaTags, FaShoppingCart, FaStar, FaPalette, FaTimes, FaCircle, FaChevronDown, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import useProducts from "../hooks/useProducts";
 import { fallbackImageBase64 } from '../assets/fallback';
@@ -7,6 +7,73 @@ import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import ScrollProgressBar from "./ScrollProgressBar";
 import { getColorHex } from "../utils/colorMap";
+import { getApiBaseUrl } from "../utils/apiClient";
+
+// Toast notification component for user feedback
+const Toast = ({ message, type, onClose }) => (
+  <motion.div
+    initial={{ opacity: 0, y: -50, x: "-50%" }}
+    animate={{ opacity: 1, y: 0, x: "-50%" }}
+    exit={{ opacity: 0, y: -50, x: "-50%" }}
+    className={`fixed top-4 left-1/2 z-50 px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+      type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+    }`}
+    role="alert"
+    aria-live="polite"
+  >
+    {type === 'error' ? <FaExclamationCircle /> : <FaCheckCircle />}
+    <span>{message}</span>
+    <button 
+      onClick={onClose} 
+      className="ml-2 hover:opacity-80"
+      aria-label="Dismiss notification"
+    >
+      <FaTimes />
+    </button>
+  </motion.div>
+);
+
+// Extracted ActiveFilters component to avoid duplication
+const ActiveFilters = ({ selectedColors, toggleColor, clearAll }) => (
+  <div className="mt-4 flex flex-wrap items-center gap-2">
+    <span className="text-sm text-gray-600">Active filters:</span>
+    {selectedColors.map(color => (
+      <motion.span
+        key={color}
+        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        exit={{ scale: 0 }}
+        whileHover={{ scale: 1.05 }}
+        transition={{ type: "spring" }}
+      >
+        {color}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleColor(color);
+          }}
+          className="ml-1 text-blue-700 hover:text-blue-900"
+          aria-label={`Remove ${color} filter`}
+        >
+          <FaTimes size={12} />
+        </button>
+      </motion.span>
+    ))}
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={(e) => {
+        e.stopPropagation();
+        clearAll();
+      }}
+      className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300 transition-colors"
+      aria-label="Clear all filters"
+    >
+      Clear all
+    </motion.button>
+  </div>
+);
 
 const ColorPalette = ({ availableColors, selectedColors, toggleColor }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -111,42 +178,11 @@ const ColorPalette = ({ availableColors, selectedColors, toggleColor }) => {
               )}
 
               {selectedColors.length > 0 && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-gray-600">Active filters:</span>
-                  {selectedColors.map(color => (
-                    <motion.span
-                      key={color}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      whileHover={{ scale: 1.05 }}
-                      transition={{ type: "spring" }}
-                    >
-                      {color}
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleColor(color);
-                        }}
-                        className="ml-1 text-blue-700 hover:text-blue-900"
-                      >
-                        <FaTimes size={12} />
-                      </button>
-                    </motion.span>
-                  ))}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectedColors.forEach(color => toggleColor(color));
-                    }}
-                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300 transition-colors"
-                  >
-                    Clear all
-                  </motion.button>
-                </div>
+                <ActiveFilters 
+                  selectedColors={selectedColors} 
+                  toggleColor={toggleColor} 
+                  clearAll={() => selectedColors.forEach(color => toggleColor(color))}
+                />
               )}
             </div>
           </motion.div>
@@ -154,48 +190,18 @@ const ColorPalette = ({ availableColors, selectedColors, toggleColor }) => {
       </AnimatePresence>
       
       {!isExpanded && selectedColors.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-gray-600">Active filters:</span>
-          {selectedColors.map(color => (
-            <motion.span
-              key={color}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: "spring" }}
-            >
-              {color}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleColor(color);
-                }}
-                className="ml-1 text-blue-700 hover:text-blue-900"
-              >
-                <FaTimes size={12} />
-              </button>
-            </motion.span>
-          ))}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              selectedColors.forEach(color => toggleColor(color));
-            }}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300 transition-colors"
-          >
-            Clear all
-          </motion.button>
-        </div>
+        <ActiveFilters 
+          selectedColors={selectedColors} 
+          toggleColor={toggleColor} 
+          clearAll={() => selectedColors.forEach(color => toggleColor(color))}
+        />
       )}
     </motion.div>
   );
 };
 
 const ProductPage = ({ addToCart, isAuthenticated }) => {
+  const API_BASE_URL = getApiBaseUrl();
   const {
     products: filteredProducts,
     searchTerm,
@@ -216,7 +222,16 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
   const [imageError, setImageError] = useState({});
   const [wishlistItems, setWishlistItems] = useState(new Set());
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
+  const abortControllerRef = useRef(null);
+  const modalRef = useRef(null);
+
+  // Show toast notification
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   // Debounced search
   const [displaySearch, setDisplaySearch] = useState(searchTerm);
@@ -227,7 +242,17 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setSearchTerm(value), 300);
   }, [setSearchTerm]);
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounceRef.current);
+      // Cancel any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -290,14 +315,21 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
     });
   };
 
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
 
+      // Cancel previous request if exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setWishlistLoading(true);
-      const response = await axios.get("https://render-user-page.onrender.com/api/user/wishlist", {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await axios.get(`${API_BASE_URL}/api/user/wishlist`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortControllerRef.current.signal
       });
 
       // Convert wishlist items to a Set of productIds for easy lookup
@@ -306,13 +338,16 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
       );
       setWishlistItems(wishlistSet);
     } catch (error) {
+      // Ignore abort errors
+      if (error.name === 'CanceledError' || error.name === 'AbortError') return;
       console.error("Error fetching wishlist:", error);
+      showToast('Failed to load wishlist', 'error');
     } finally {
       setWishlistLoading(false);
     }
-  };
+  }, [API_BASE_URL, showToast]);
 
-  const toggleWishlist = async (e, product) => {
+  const toggleWishlist = useCallback(async (e, product) => {
     e.stopPropagation();
     
     if (!isAuthenticated) {
@@ -329,7 +364,7 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
       
       if (wishlistItems.has(productId)) {
         // Remove from wishlist
-        await axios.delete(`https://render-user-page.onrender.com/api/user/wishlist/${productId}`, {
+        await axios.delete(`${API_BASE_URL}/api/user/wishlist/${encodeURIComponent(productId)}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -338,9 +373,10 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
           newSet.delete(productId);
           return newSet;
         });
+        showToast('Removed from wishlist');
       } else {
         // Add to wishlist
-        await axios.post("https://render-user-page.onrender.com/api/user/wishlist", {
+        await axios.post(`${API_BASE_URL}/api/user/wishlist`, {
           productId,
           name: product.name,
           price: product.price,
@@ -356,17 +392,20 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
           newSet.add(productId);
           return newSet;
         });
+        showToast('Added to wishlist');
       }
     } catch (error) {
       console.error("Error updating wishlist:", error);
+      const message = error.response?.data?.message || 'Failed to update wishlist';
+      showToast(message, 'error');
     }
-  };
+  }, [isAuthenticated, navigate, wishlistItems, API_BASE_URL, showToast]);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchWishlist();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchWishlist]);
 
   const renderProductImage = (product) => {
     if (!product.image || imageError[product.id]) {
@@ -424,15 +463,17 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
           className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all duration-300"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
+          aria-label={wishlistItems.has(String(product.id)) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          aria-pressed={wishlistItems.has(String(product.id))}
         >
           {wishlistLoading ? (
-            <FaSpinner className="text-gray-400 text-xl animate-spin" />
+            <FaSpinner className="text-gray-400 text-xl animate-spin" aria-hidden="true" />
           ) : wishlistItems.has(String(product.id)) ? (
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }}>
-              <FaHeart className="text-red-500 text-xl" />
+              <FaHeart className="text-red-500 text-xl" aria-hidden="true" />
             </motion.div>
           ) : (
-            <FaRegHeart className="text-gray-600 text-xl" />
+            <FaRegHeart className="text-gray-600 text-xl" aria-hidden="true" />
           )}
         </motion.button>
 
@@ -697,6 +738,17 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
         </AnimatePresence>
       </motion.div>
 
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -704,16 +756,23 @@ const ProductPage = ({ addToCart, isAuthenticated }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
           >
             <motion.div
+              ref={modalRef}
               className="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200"
               initial={{ scale: 0.8, y: 20, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onKeyDown={(e) => e.key === 'Escape' && setShowModal(false)}
+              tabIndex={-1}
             >
-              <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-teal-600 to-blue-600 text-transparent bg-clip-text flex items-center gap-2">
-                <FaShoppingCart /> Add to Cart
+              <h2 id="modal-title" className="text-3xl font-bold mb-4 bg-gradient-to-r from-teal-600 to-blue-600 text-transparent bg-clip-text flex items-center gap-2">
+                <FaShoppingCart aria-hidden="true" /> Add to Cart
               </h2>
               <p className="text-gray-700 mb-6">
                 How many units of <span className="font-semibold text-blue-600">{selectedProduct?.name}</span> would

@@ -1,11 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaRobot, FaComments, FaTimes, FaPaperPlane, FaSpinner, FaLightbulb, FaMicrophone, 
-         FaThumbsUp, FaThumbsDown, FaRegSmile, FaRegCopy, FaVolumeUp } from 'react-icons/fa';
+         FaThumbsUp, FaThumbsDown, FaRegSmile, FaRegCopy, FaVolumeUp, FaDownload } from 'react-icons/fa';
 import { useTranslation } from '../utils/TranslationContext';
 import { knowledgeBase, extendedKnowledgeBase } from '../data/chatbotKnowledgeBase';
 import { preprocessText, calculateSimilarity, detectIntent, extractEntities, 
          generateContextualResponse, calculateRelevanceScore } from '../utils/nlpUtils';
+import { getApiBaseUrl } from '../utils/apiClient';
+import { sanitizeInput } from '../utils/sanitize';
+
+// Constants for rate limiting and history management
+const MAX_MESSAGES_STORED = 100;
+const MIN_MESSAGE_INTERVAL = 500; // ms between messages
+const API_BASE_URL = getApiBaseUrl();
 
 const ChatBot = () => {
   const { t } = useTranslation();
@@ -21,13 +28,21 @@ const ChatBot = () => {
           new Map(parsedMessages.map(msg => [msg.id, msg])).values()
         );
         
-        return uniqueMessages.map(msg => {
+        // Limit stored messages to prevent localStorage bloat
+        const limitedMessages = uniqueMessages.slice(-MAX_MESSAGES_STORED);
+        
+        return limitedMessages.map(msg => {
           try {
             const timestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
             if (isNaN(timestamp.getTime())) {
               throw new Error('Invalid timestamp');
             }
-            return { ...msg, timestamp };
+            // Sanitize message text on load
+            return { 
+              ...msg, 
+              text: typeof msg.text === 'string' ? sanitizeInput(msg.text) : msg.text,
+              timestamp 
+            };
           } catch (err) {
             console.warn('Invalid timestamp for message, using current time instead');
             return { ...msg, timestamp: new Date() };
@@ -59,6 +74,7 @@ const ChatBot = () => {
   const [isUserTyping, setIsUserTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [lastMessageTime, setLastMessageTime] = useState(0);
   const [conversationContext, setConversationContext] = useState(() => {
     const savedContext = localStorage.getItem('kspChatContext');
     return savedContext ? JSON.parse(savedContext) : {
@@ -80,7 +96,30 @@ const ChatBot = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const audioRef = useRef(new Audio('/sounds/message-received.mp3'));
+  const audioRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
+  // Initialize audio on mount
+  useEffect(() => {
+    audioRef.current = new Audio('/sounds/message-received.mp3');
+    return () => {
+      // Cleanup audio on unmount
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      // Cleanup speech recognition
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+      // Cleanup pending API requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Define scrollToBottom before using it in useEffect
   const scrollToBottom = useCallback(() => {
@@ -161,7 +200,9 @@ const ChatBot = () => {
 
   useEffect(() => {
     if (messages.length > 1 && messages[messages.length - 1].sender === 'bot') {
-      audioRef.current.play().catch(() => {});
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
     }
   }, [messages]);
 
@@ -230,8 +271,47 @@ const ChatBot = () => {
     });
   }, []);
 
+  // Query backend for intelligent responses based on product data
+  const queryBackendChatbot = useCallback(async (userMessage, intent, entities) => {
+    try {
+      // Cancel previous request if exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      const response = await fetch(`${API_BASE_URL}/api/chatbot/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: sanitizeInput(userMessage),
+          intent,
+          entities,
+          context: {
+            lastTopic: conversationContext.lastTopic,
+            recentTopics: conversationContext.recentTopics
+          }
+        }),
+        signal: abortControllerRef.current.signal
+      });
+
+      if (!response.ok) {
+        throw new Error('Backend query failed');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') return null;
+      console.error('Backend chatbot query error:', error);
+      return null;
+    }
+  }, [conversationContext.lastTopic, conversationContext.recentTopics]);
+
   // Now findBotResponse can use these functions in its dependency array
-  const findBotResponse = useCallback((userMessage) => {
+  const findBotResponse = useCallback(async (userMessage) => {
     const normalizedMessage = userMessage.toLowerCase();
     const possibleName = extractUserName(userMessage);
     if (possibleName) {
@@ -244,6 +324,19 @@ const ChatBot = () => {
     // Extract user intent and entities for better understanding
     const userIntent = detectIntent(userMessage);
     const entities = extractEntities(userMessage);
+
+    // Try backend first for product/order related queries
+    if (['purchase', 'information', 'specification', 'comparison'].includes(userIntent) ||
+        entities.yarnTypes.length > 0 || entities.products.length > 0) {
+      const backendResponse = await queryBackendChatbot(userMessage, userIntent, entities);
+      if (backendResponse && backendResponse.response) {
+        updateConversationContext(backendResponse.topic || 'products');
+        if (backendResponse.suggestedQuestions) {
+          setSuggestedQuestions(backendResponse.suggestedQuestions);
+        }
+        return backendResponse.response;
+      }
+    }
 
     // Pre-process the user message for NLP matching
     // eslint-disable-next-line no-unused-vars
@@ -414,14 +507,23 @@ const ChatBot = () => {
     }
     
     return t("I'm not sure I understand. Could you please rephrase your question? I can help with information about our products, sustainability practices, ordering process, or company information.", "chatbot");
-  }, [conversationContext, extractUserName, isNewVisitorGreeting, t, updateConversationContext]);
+  }, [conversationContext, extractUserName, isNewVisitorGreeting, t, updateConversationContext, queryBackendChatbot]);
 
   // Define handleSendMessage before it's used in handleKeyDown
-  const handleSendMessage = useCallback(() => {
+  const handleSendMessage = useCallback(async () => {
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) {
+      return; // Too fast, ignore
+    }
+    setLastMessageTime(now);
+
     if (!newMessage || newMessage.trim() === '') return;
     
     const messageId = Date.now();
-    const userMessageText = newMessage.trim();
+    // Sanitize user input before storing
+    const userMessageText = sanitizeInput(newMessage.trim());
+    if (!userMessageText) return; // Empty after sanitization
     const newMessageObject = {
       id: messageId,
       text: userMessageText,
@@ -438,17 +540,21 @@ const ChatBot = () => {
     );
     
     if (!isDuplicate) {
-      setMessages(prevMessages => [...prevMessages, newMessageObject]);
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, newMessageObject];
+        // Enforce message limit
+        return newMessages.slice(-MAX_MESSAGES_STORED);
+      });
     }
     
     setNewMessage('');
     setIsTyping(true);
     
     // Optimized response time - reduced minimum delay
-    setTimeout(() => {
+    setTimeout(async () => {
       let responseText;
       try {
-        responseText = findBotResponse(userMessageText) || "I'm sorry, I couldn't process that request.";
+        responseText = await findBotResponse(userMessageText) || "I'm sorry, I couldn't process that request.";
         
         const lastBotMessage = messages.filter(msg => msg.sender === 'bot').pop();
         if (lastBotMessage && lastBotMessage.text === responseText) {
@@ -472,10 +578,14 @@ const ChatBot = () => {
         reaction: null
       };
       
-      setMessages(prevMessages => [...prevMessages, botResponse]);
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, botResponse];
+        // Enforce message limit
+        return newMessages.slice(-MAX_MESSAGES_STORED);
+      });
       setIsTyping(false);
     }, 500 + Math.random() * 500); // Reduced response time for better responsiveness
-  }, [findBotResponse, newMessage, messages, t]); // Added 't' dependency
+  }, [findBotResponse, newMessage, messages, t, lastMessageTime]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -523,11 +633,20 @@ const ChatBot = () => {
   const handleSuggestedQuestion = useCallback((question) => {
     if (!question) return;
     
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) {
+      return;
+    }
+    setLastMessageTime(now);
+    
     const messageId = Date.now();
+    // Sanitize the question
+    const sanitizedQuestion = sanitizeInput(question);
     
     const isDuplicate = messages.some(msg => 
       msg.sender === 'user' && 
-      msg.text === question && 
+      msg.text === sanitizedQuestion && 
       (new Date().getTime() - new Date(msg.timestamp).getTime()) < 2000
     );
     
@@ -535,20 +654,23 @@ const ChatBot = () => {
     
     const userMessage = {
       id: messageId,
-      text: question,
+      text: sanitizedQuestion,
       sender: 'user',
       timestamp: new Date(),
       feedback: null,
       reaction: null
     };
     
-    setMessages(prevMessages => [...prevMessages, userMessage]);
+    setMessages(prevMessages => {
+      const newMessages = [...prevMessages, userMessage];
+      return newMessages.slice(-MAX_MESSAGES_STORED);
+    });
     setIsTyping(true);
     
-    setTimeout(() => {
+    setTimeout(async () => {
       let responseText;
       try {
-        responseText = findBotResponse(question) || "I'm sorry, I couldn't process that request.";
+        responseText = await findBotResponse(sanitizedQuestion) || "I'm sorry, I couldn't process that request.";
         
         const lastBotMessage = messages.filter(msg => msg.sender === 'bot').pop();
         if (lastBotMessage && lastBotMessage.text === responseText) {
@@ -570,10 +692,13 @@ const ChatBot = () => {
         reaction: null
       };
       
-      setMessages(prevMessages => [...prevMessages, botResponse]);
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, botResponse];
+        return newMessages.slice(-MAX_MESSAGES_STORED);
+      });
       setIsTyping(false);
     }, 1000 + Math.random() * 1000);
-  }, [findBotResponse, messages, t]);
+  }, [findBotResponse, messages, t, lastMessageTime]);
 
   const formatTimestamp = useCallback((timestamp) => {
     try {
@@ -605,6 +730,7 @@ const ChatBot = () => {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
       
       recognition.lang = 'en-US';
       recognition.continuous = false;
@@ -616,16 +742,19 @@ const ChatBot = () => {
       
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        setNewMessage(transcript);
+        // Sanitize speech input
+        setNewMessage(sanitizeInput(transcript));
         setIsListening(false);
       };
       
       recognition.onerror = () => {
         setIsListening(false);
+        recognitionRef.current = null;
       };
       
       recognition.onend = () => {
         setIsListening(false);
+        recognitionRef.current = null;
       };
       
       recognition.start();
@@ -853,7 +982,7 @@ const ChatBot = () => {
                     aria-label={t("Export chat history", "chatbot")}
                     title={t("Export chat history", "chatbot")}
                   >
-                    <FaVolumeUp className="text-sm" />
+                    <FaDownload className="text-sm" />
                   </button>
                   <button 
                     onClick={clearChatHistory}

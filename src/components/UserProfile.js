@@ -10,6 +10,7 @@ import {
   FaTrophy, FaAward, FaGem, FaChartLine, FaInfoCircle
 } from "react-icons/fa";
 import axios from "axios";
+import { getApiBaseUrl } from "../utils/apiClient";
 
 const UserProfile = () => {
   const [user, setUser] = useState(null);
@@ -139,7 +140,7 @@ const UserProfile = () => {
     }
   ], []); // Empty dependency array since these definitions don't depend on any state or props
 
-  const API_URL = "https://render-user-page.onrender.com";
+  const API_URL = getApiBaseUrl();
 
   const fetchUserProfile = async () => {
     setLoading(true);

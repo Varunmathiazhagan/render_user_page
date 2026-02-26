@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import RobotLoader from './RobotLoader';
 import { useTranslation } from "../utils/TranslationContext";
 import ScrollProgressBar from "./ScrollProgressBar";
+import { fetchProductsCached, checkBackendConnection } from "../utils/apiClient";
 
 const RecommendationsPage = () => {
   const { t } = useTranslation();
@@ -87,11 +88,7 @@ const RecommendationsPage = () => {
     const fetchProducts = async () => {
       setIsFetchingProducts(true);
       try {
-        const response = await fetch("https://render-user-page.onrender.com/api/products");
-        if (!response.ok) {
-          throw new Error("Failed to fetch products");
-        }
-        const data = await response.json();
+        const data = await fetchProductsCached();
         if (mounted) {
           setAllProducts(Array.isArray(data) ? data : []);
         }
@@ -99,7 +96,12 @@ const RecommendationsPage = () => {
         if (mounted) {
           const fallbackProducts = allRecommendations.flat(2).filter((item) => item && typeof item === "object");
           setAllProducts(fallbackProducts);
-          setError("Unable to load product data from database. Please try again.");
+          const health = await checkBackendConnection();
+          setError(
+            health.ok
+              ? "Unable to load product data from database. Please try again."
+              : "Backend is unreachable. Please check frontend-backend connection and server status."
+          );
         }
       } finally {
         if (mounted) {

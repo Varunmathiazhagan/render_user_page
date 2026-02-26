@@ -12,6 +12,7 @@ import {
   FaTruck
 } from "react-icons/fa";
 import axios from "axios";
+import { getApiBaseUrl } from "../utils/apiClient";
 
 const Payment = ({ 
   cart, 
@@ -22,6 +23,7 @@ const Payment = ({
   handleBackClick, 
   onSuccessfulPayment
 }) => {
+  const API_BASE_URL = getApiBaseUrl();
   const [paymentMethod, setPaymentMethod] = useState("razorpay");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState({
@@ -52,8 +54,16 @@ const Payment = ({
     setIsProcessingPayment(true);
     setPaymentStatus({ status: "processing", message: "Processing your payment..." });
 
-    // Always use signed-in user's email when available
-    const userEmail = user?.email || shippingInfo.email;
+    // Use signed-in user's email (email field was removed from shipping form)
+    const userEmail = user?.email;
+
+    if (!userEmail) {
+      setIsProcessingPayment(false);
+      setPaymentStatus({ status: "error", message: "User email is required. Please sign in to place an order." });
+      return;
+    }
+
+    const token = localStorage.getItem('token');
 
     // Order data structure
     const orderData = {
@@ -88,10 +98,11 @@ const Payment = ({
     // For Cash on Delivery
     if (paymentMethod === "cod") {
       try {
-        const response = await axios.post("https://render-user-page.onrender.com/api/orders", orderData, {
-          timeout: 10000, // Add timeout for better error handling
+        const response = await axios.post(`${API_BASE_URL}/api/orders`, orderData, {
+          timeout: 10000,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
           }
         });
         
@@ -135,7 +146,8 @@ const Payment = ({
     // For Razorpay
     try {
       await checkRazorpayReady();
-      const amount = totalPrice * 100;
+      const finalTotal = totalPrice + (deliveryMethod === "express" ? 100 : 0);
+      const amount = finalTotal * 100;
       const options = {
         key: "rzp_test_59tiIuPnfUGOrp",
         amount,
@@ -152,10 +164,11 @@ const Payment = ({
           };
           orderData.paymentResult = paymentResult;
           try {
-            const orderResponse = await axios.post("https://render-user-page.onrender.com/api/orders", orderData, {
+            const orderResponse = await axios.post(`${API_BASE_URL}/api/orders`, orderData, {
               timeout: 10000,
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
               }
             });
             
